@@ -1,0 +1,34 @@
+﻿@page
+@model QualityDoc.Pages.RegisterModel
+<h2>Registro</h2>
+
+<form method="post">
+    <div>
+        <label>Nombre:</label>
+        <input type="text" asp-for="Nombre" required />
+    </div>
+
+    <div>
+        <label>Correo:</label>
+        <input type="email" asp-for="Correo" required />
+    </div>
+
+    <div>
+        <label>Contraseña:</label>
+        <input type="password" asp-for="Password" required />
+    </div>
+
+    <div>
+        <label>Rol:</label>
+        <select asp-for="RolId">
+            <option value="1">Admin</option>
+            <option value="2">Aprobador</option>
+            <option value="3">Operario</option>
+        </select>
+    </div>
+
+    <button type="submit">Registrarse</button>
+</form>
+
+<p style="color:red">@Model.Error</p>
+<p style="color:green">@Model.Mensaje</p>
