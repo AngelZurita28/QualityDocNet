@@ -1,10 +1,94 @@
 ﻿@page
 @model IndexModel
+
 @{
-    ViewData["Title"] = "Home page";
+    ViewData["Title"] = "Dashboard";
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
-</div>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-100">
+
+    <div class="flex">
+
+        <aside class="w-64 bg-white h-screen shadow-md p-4">
+            <h1 class="text-xl font-bold text-blue-600">QualityDoc</h1>
+
+            <nav class="mt-6 space-y-2">
+                <a href="/Index" class="block p-2 bg-blue-100 text-blue-700 rounded">Dashboard</a>
+                <a href="/Documents/List" class="block p-2 hover:bg-gray-200 rounded">Documentos</a>
+            </nav>
+
+            <div class="mt-10">
+                <a href="/Documents/Create" class="bg-blue-600 text-white px-4 py-2 rounded w-full block text-center">
+                    + Nuevo Documento
+                </a>
+            </div>
+        </aside>
+
+        <main class="flex-1 p-6">
+
+            <h2 class="text-2xl font-bold mb-2">Gestión de Documentos</h2>
+            <p class="text-gray-500 mb-4">Empresa: @ViewData["Empresa"]</p>
+
+            <div class="bg-white rounded shadow">
+                <table class="w-full">
+                    <thead class="bg-gray-200">
+                        <tr>
+                            <th class="p-3 text-left">Título</th>
+                            <th class="p-3">Versión</th>
+                            <th class="p-3">Estado</th>
+                            <th class="p-3">Sync</th>
+                            <th class="p-3">Acción</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        @foreach (var doc in Model.Documentos)
+                        {
+                            <tr class="border-t">
+                                <td class="p-3">
+                                    <b>@doc.Title</b><br />
+                                    <span class="text-gray-500 text-sm">@doc.Description</span>
+                                </td>
+
+                                <td class="p-3 text-center">
+                                    v@doc.VersionNumber
+                                </td>
+
+                                <td class="p-3 text-center">
+                                    @doc.StatusId
+                                </td>
+
+                                <td class="p-3 text-center">
+                                    @(doc.SyncFirebase ? "✔" : "❌")
+                                </td>
+
+                                <td class="p-3 text-center">
+                                    @if (!doc.SyncFirebase)
+                                    {
+                                        <form method="post" asp-page-handler="Sync">
+                                            <input type="hidden" name="id" value="@doc.Id" />
+                                            <button class="bg-green-500 text-white px-2 py-1 rounded">
+                                                Sync
+                                            </button>
+                                        </form>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+        </main>
+
+    </div>
+
+</body>
+</html>

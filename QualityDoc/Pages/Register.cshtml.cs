@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using QualityDoc.Data;
 using QualityDoc.Helpers;
@@ -11,16 +11,16 @@ namespace QualityDoc.Pages
         private readonly AppDbContext _context;
 
         [BindProperty]
-        public string Nombre { get; set; } = string.Empty;
+        public string FullName { get; set; } = string.Empty;
 
         [BindProperty]
-        public string Correo { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
 
         [BindProperty]
         public string Password { get; set; } = string.Empty;
 
         [BindProperty]
-        public int RolId { get; set; }
+        public int RoleId { get; set; }
 
         public string Error { get; set; } = string.Empty;
         public string Mensaje { get; set; } = string.Empty;
@@ -34,11 +34,11 @@ namespace QualityDoc.Pages
 
         public IActionResult OnPost()
         {
-            var existe = _context.Usuarios.Any(u => u.Correo == Correo);
+            var existe = _context.Users.Any(u => u.Email == Email);
 
             if (existe)
             {
-                Error = "El correo ya est� registrado";
+                Error = "El correo ya está registrado";
                 return Page();
             }
 
@@ -46,18 +46,21 @@ namespace QualityDoc.Pages
 
             var usuario = new Usuario
             {
-                Nombre = Nombre,
-                Correo = Correo,
+                FullName = FullName,
+                Email = Email,
                 PasswordHash = hash,
-                RolId = RolId,
-                Activo = true,
-                FechaCreacion = DateTime.Now
+                RoleId = RoleId,
+                IsActive = true,
+                CreatedAt = DateTime.Now,
+                CompanyId = null 
             };
 
-            _context.Usuarios.Add(usuario);
+            _context.Users.Add(usuario);
             _context.SaveChanges();
 
-            Mensaje = "Usuario registrado correctamente";
+            HttpContext.Session.SetInt32("UserId", usuario.Id);
+            HttpContext.Session.SetString("Usuario", usuario.FullName);
+            HttpContext.Session.SetString("Rol", usuario.RoleId.ToString());
 
             return RedirectToPage("/Index");
         }

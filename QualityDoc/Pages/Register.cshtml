@@ -1,16 +1,17 @@
 ﻿@page
 @model QualityDoc.Pages.RegisterModel
+
 <h2>Registro</h2>
 
 <form method="post">
     <div>
         <label>Nombre:</label>
-        <input type="text" asp-for="Nombre" required />
+        <input type="text" asp-for="FullName" required />
     </div>
 
     <div>
         <label>Correo:</label>
-        <input type="email" asp-for="Correo" required />
+        <input type="email" asp-for="Email" required />
     </div>
 
     <div>
@@ -20,10 +21,11 @@
 
     <div>
         <label>Rol:</label>
-        <select asp-for="RolId">
-            <option value="1">Admin</option>
-            <option value="2">Aprobador</option>
-            <option value="3">Operario</option>
+        <select asp-for="RoleId">
+            <option value="1">SuperAdmin</option>
+            <option value="2">Admin</option>
+            <option value="3">Approver</option>
+            <option value="4">Operator</option>
         </select>
     </div>
 

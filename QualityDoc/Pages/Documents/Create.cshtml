@@ -1,0 +1,40 @@
+﻿@page
+@model QualityDoc.Pages.Documents.CreateModel
+
+<h2>Subir Documento</h2>
+
+<form method="post" enctype="multipart/form-data">
+    <div>
+        <label>Título:</label>
+        <input asp-for="Title" required />
+    </div>
+
+    <div>
+        <label>Descripción:</label>
+        <textarea asp-for="Description"></textarea>
+    </div>
+
+    <div>
+        <label>Archivo:</label>
+        <input type="file" asp-for="File" required />
+    </div>
+
+    <br />
+
+    <label>
+        <input type="checkbox" asp-for="EsNuevaVersion" />
+        ¿Es nueva versión?
+    </label>
+
+    <div>
+        <label>Código documento existente:</label>
+        <input asp-for="CodigoExistente" />
+        <small>Solo si es nueva versión</small>
+    </div>
+
+    <br />
+
+    <button type="submit">Guardar</button>
+</form>
+
+<p style="color:red">@Model.Error</p>

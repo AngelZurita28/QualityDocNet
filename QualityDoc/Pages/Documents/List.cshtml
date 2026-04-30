@@ -1,0 +1,63 @@
+﻿@page
+@model QualityDoc.Pages.Documents.ListModel
+
+<h2>Lista de Documentos</h2>
+
+<table border="1">
+    <tr>
+        <th>Código</th>
+        <th>ID</th>
+        <th>Título</th>
+        <th>Descripción</th>
+        <th>Archivo</th>
+        <th>Autor</th>
+        <th>Empresa</th>
+        <th>Estado</th>
+        <th>Versión</th>
+        <th>Fecha</th>
+        <th>Sync</th>
+        <th>Acción</th>
+    </tr>
+
+    @foreach (var doc in Model.Documentos)
+    {
+        <tr>
+            <td><b>@doc.DocumentCode</b></td>
+            <td>@doc.Id</td>
+            <td>@doc.Title</td>
+            <td>@doc.Description</td>
+
+            <td>
+                <a href="@doc.FilePath" target="_blank">Ver</a>
+            </td>
+
+            <td>@doc.AuthorId</td>
+            <td>@doc.CompanyId</td>
+            <td>@doc.StatusId</td>
+
+            <td>
+                v@doc.VersionNumber
+                @if (doc.IsLatest)
+                {
+                    <span style="color:green;">(Actual)</span>
+                }
+            </td>
+
+            <td>@doc.CreatedAt</td>
+
+            <td>
+                @(doc.SyncFirebase ? "✔ Sincronizado" : "❌ Pendiente")
+            </td>
+
+            <td>
+                @if (!doc.SyncFirebase)
+                {
+                    <form method="post" asp-page-handler="Sync">
+                        <input type="hidden" name="id" value="@doc.Id" />
+                        <button type="submit">Sincronizar</button>
+                    </form>
+                }
+            </td>
+        </tr>
+    }
+</table>

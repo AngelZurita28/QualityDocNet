@@ -1,0 +1,16 @@
+﻿namespace QualityDoc.Pages.Models
+{
+    public class ApprovalHistory
+    {
+        public int Id { get; set; }
+        public Guid DocumentId { get; set; }
+        public int UserId { get; set; }
+
+        public string Action { get; set; }
+        public string Comment { get; set; }
+        public DateTime ActionDate { get; set; }
+
+        public Documento Document { get; set; }
+        public Usuario User { get; set; }
+    }
+}

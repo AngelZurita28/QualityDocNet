@@ -1,20 +1,85 @@
 ﻿@page
-@model LoginModel
+@model QualityDoc.Pages.LoginModel
 
-<h2>Login</h2>
+<!DOCTYPE html>
+<html class="light" lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>QualityDoc Admin - Iniciar Sesión</title>
 
-<form method="post">
-    <div>
-        <label>Correo:</label>
-        <input type="email" asp-for="Correo" required />
-    </div>
+    <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
 
-    <div>
-        <label>Contraseña:</label>
-        <input type="password" asp-for="Password" required />
-    </div>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
 
-    <button type="submit">Iniciar sesión</button>
-</form>
+    <style>
+        body {
+        background-color: #F9FAFB;
+        font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
 
-<p style="color:red">@Model.Error</p>
+<body class="flex flex-col min-h-screen">
+
+    <main class="flex-grow flex items-center justify-center p-6">
+
+        <div class="w-full max-w-[400px]">
+
+            <div class="flex flex-col items-center mb-8">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="material-symbols-outlined text-blue-600 text-4xl">description</span>
+                    <h1 class="text-2xl font-bold">QualityDoc</h1>
+                </div>
+                <p class="text-gray-500">Sistema de Gestión Documental</p>
+            </div>
+
+            <div class="bg-white border rounded-lg p-6 shadow-sm">
+
+                <form method="post" class="flex flex-col gap-4">
+
+                    <div>
+                        <label class="text-sm text-gray-600">Correo Electrónico</label>
+                        <div class="relative">
+                            <span class="material-symbols-outlined absolute left-2 top-2 text-gray-400">mail</span>
+                            <input asp-for="Correo" type="email"
+                                   class="w-full pl-10 h-9 border rounded focus:border-blue-500 outline-none"
+                                   placeholder="ejemplo@planta.com" required />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="text-sm text-gray-600">Contraseña</label>
+                        <div class="relative">
+                            <span class="material-symbols-outlined absolute left-2 top-2 text-gray-400">lock</span>
+                            <input asp-for="Password" type="password"
+                                   class="w-full pl-10 h-9 border rounded focus:border-blue-500 outline-none"
+                                   placeholder="••••••••" required />
+                        </div>
+                    </div>
+
+                    <button type="submit"
+                            class="w-full h-9 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center justify-center gap-2">
+                        Ingresar al Sistema
+                        <span class="material-symbols-outlined text-sm">login</span>
+                    </button>
+
+                </form>
+
+                @if (!string.IsNullOrEmpty(Model.Error))
+                {
+                    <p class="text-red-500 text-sm mt-3">@Model.Error</p>
+                }
+
+            </div>
+
+            <div class="mt-6 text-center text-gray-400 text-sm">
+                © 2024 QualityDoc Admin
+            </div>
+
+        </div>
+    </main>
+
+</body>
+</html>

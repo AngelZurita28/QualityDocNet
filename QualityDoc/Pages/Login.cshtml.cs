@@ -31,11 +31,12 @@ public class LoginModel : PageModel
 
         var hash = PasswordHelper.HashPassword(Password);
 
-        var usuario = _context.Usuarios
-            .Include(u => u.Rol)
-            .FirstOrDefault(u => u.Correo == Correo
-                              && u.PasswordHash == hash
-                              && u.Activo == true); 
+        var usuario = _context.Users
+             .Include(u => u.Rol)
+             .FirstOrDefault(u => u.Email == Correo
+                      && u.PasswordHash == hash
+                      && u.IsActive);
+
 
         if (usuario == null)
         {
@@ -44,8 +45,9 @@ public class LoginModel : PageModel
         }
 
         // Guardar sesión
-        HttpContext.Session.SetString("Usuario", usuario.Nombre);
-        HttpContext.Session.SetString("Rol", usuario.Rol.Nombre);
+        HttpContext.Session.SetInt32("UserId", usuario.Id);
+        HttpContext.Session.SetString("Usuario", usuario.FullName);
+        HttpContext.Session.SetString("Rol", usuario.Rol.Name);
 
         return RedirectToPage("/Index");
     }

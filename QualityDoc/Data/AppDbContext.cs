@@ -7,45 +7,62 @@ namespace QualityDoc.Data
     {
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
+        public DbSet<Usuario> Users { get; set; }
         public DbSet<Rol> Roles { get; set; }
-        public DbSet<Usuario> Usuarios { get; set; }
-        public DbSet<EstadoDocumento> EstadosDocumento { get; set; }
-        public DbSet<Documento> Documentos { get; set; }
-        public DbSet<HistorialAprobacion> HistorialAprobaciones { get; set; }
+        public DbSet<Company> Companies { get; set; }
+        public DbSet<DocumentStatus> DocumentStatus { get; set; }
+        public DbSet<Documento> Documents { get; set; }
+        public DbSet<ApprovalHistory> ApprovalHistory { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            // UUID
+            
             modelBuilder.Entity<Documento>()
                 .Property(d => d.Id)
                 .HasDefaultValueSql("NEWID()");
 
-            // Relaciones
-            modelBuilder.Entity<Usuario>()
-                .HasOne(u => u.Rol)
-                .WithMany(r => r.Usuarios)
-                .HasForeignKey(u => u.RolId);
-
             modelBuilder.Entity<Documento>()
-                .HasOne(d => d.Autor)
+                .HasOne(d => d.Author)
                 .WithMany()
-                .HasForeignKey(d => d.AutorId)
+                .HasForeignKey(d => d.AuthorId)
                 .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<Documento>()
-                .HasOne(d => d.Estado)
-                .WithMany(e => e.Documentos)
-                .HasForeignKey(d => d.EstadoId);
+                .HasOne(d => d.Status)
+                .WithMany(s => s.Documents)
+                .HasForeignKey(d => d.StatusId);
 
-            modelBuilder.Entity<HistorialAprobacion>()
-                .HasOne(h => h.Documento)
-                .WithMany(d => d.Historial)
-                .HasForeignKey(h => h.DocumentoId);
-
-            modelBuilder.Entity<HistorialAprobacion>()
-                .HasOne(h => h.Usuario)
+            modelBuilder.Entity<Documento>()
+                .HasOne(d => d.Company)
                 .WithMany()
-                .HasForeignKey(h => h.UsuarioId);
+                .HasForeignKey(d => d.CompanyId);
+
+            modelBuilder.Entity<Documento>()
+                .HasOne<Documento>()
+                .WithMany()
+                .HasForeignKey(d => d.ParentId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Usuario>()
+                .HasOne(u => u.Rol)
+                .WithMany(r => r.Users)
+                .HasForeignKey(u => u.RoleId);
+
+            modelBuilder.Entity<Usuario>()
+                .HasOne(u => u.Company)
+                .WithMany(c => c.Users)
+                .HasForeignKey(u => u.CompanyId);
+
+            
+            modelBuilder.Entity<ApprovalHistory>()
+                .HasOne(h => h.Document)
+                .WithMany()
+                .HasForeignKey(h => h.DocumentId);
+
+            modelBuilder.Entity<ApprovalHistory>()
+                .HasOne(h => h.User)
+                .WithMany()
+                .HasForeignKey(h => h.UserId);
         }
     }
 }

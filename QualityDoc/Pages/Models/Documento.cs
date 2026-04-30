@@ -3,17 +3,29 @@
     public class Documento
     {
         public Guid Id { get; set; }
-        public string Titulo { get; set; }
-        public string Descripcion { get; set; }
-        public string RutaArchivo { get; set; }
+        public Guid? ParentId { get; set; }
 
-        public int AutorId { get; set; }
-        public int EstadoId { get; set; }
-        public DateTime FechaCreacion { get; set; }
+        public int VersionNumber { get; set; }
+        public bool IsLatest { get; set; }
 
-        public Usuario Autor { get; set; }
-        public EstadoDocumento Estado { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public string? FilePath { get; set; }
 
-        public ICollection<HistorialAprobacion> Historial { get; set; }
+        public int AuthorId { get; set; }
+        public int StatusId { get; set; }
+        public int? CompanyId { get; set; }
+        public string? DocumentCode { get; set; }
+
+        public DateTime CreatedAt { get; set; }
+
+        public bool SyncPostgre { get; set; }
+        public bool SyncFirebase { get; set; }
+
+        public string? LastErrorLog { get; set; }
+
+        public Usuario Author { get; set; }
+        public DocumentStatus Status { get; set; }
+        public Company Company { get; set; }
     }
 }
