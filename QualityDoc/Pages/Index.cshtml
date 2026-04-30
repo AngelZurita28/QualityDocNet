@@ -25,9 +25,10 @@
             </nav>
 
             <div class="mt-10">
-                <a href="/Documents/Create" class="bg-blue-600 text-white px-4 py-2 rounded w-full block text-center">
+                <button onclick="abrirModal()"
+                        class="bg-blue-600 text-white px-4 py-2 rounded w-full">
                     + Nuevo Documento
-                </a>
+                </button>
             </div>
         </aside>
 
@@ -89,6 +90,64 @@
         </main>
 
     </div>
+
+    <div id="modalCreate" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-50">
+
+        <div class="bg-white w-full max-w-2xl rounded-xl p-6">
+
+            <h2 class="text-xl font-bold mb-4">Subir Documento</h2>
+
+            <form method="post" enctype="multipart/form-data" asp-page-handler="Create">
+
+                <div class="mb-3">
+                    <label>Título</label>
+                    <input asp-for="Title" class="w-full border p-2 rounded" required />
+                </div>
+
+                <div class="mb-3">
+                    <label>Descripción</label>
+                    <textarea asp-for="Description" class="w-full border p-2 rounded"></textarea>
+                </div>
+
+                <div class="mb-3">
+                    <label>Archivo</label>
+                    <input type="file" asp-for="File" class="w-full border p-2 rounded" required />
+                </div>
+
+                <label>
+                    <input type="checkbox" asp-for="EsNuevaVersion" />
+                    Es nueva versión
+                </label>
+
+                <div class="mt-2">
+                    <input asp-for="CodigoExistente" class="w-full border p-2 rounded" placeholder="Código existente" />
+                </div>
+
+                <div class="flex justify-end gap-2 mt-4">
+                    <button type="button" onclick="cerrarModal()" class="px-4 py-2 border rounded">
+                        Cancelar
+                    </button>
+
+                    <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded">
+                        Guardar
+                    </button>
+                </div>
+
+            </form>
+
+        </div>
+
+    </div>
+    <script>
+        function abrirModal() {
+        document.getElementById("modalCreate").classList.remove("hidden");
+        document.getElementById("modalCreate").classList.add("flex");
+        }
+
+        function cerrarModal() {
+        document.getElementById("modalCreate").classList.add("hidden");
+        }
+    </script>
 
 </body>
 </html>
