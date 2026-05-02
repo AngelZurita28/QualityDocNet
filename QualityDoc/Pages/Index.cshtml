@@ -1,153 +1,189 @@
 ﻿@page
 @model IndexModel
-
 @{
     ViewData["Title"] = "Dashboard";
 }
 
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="utf-8" />
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
+<div class="p-6 max-w-7xl mx-auto space-y-6 text-sm">
 
-<body class="bg-gray-100">
-
-    <div class="flex">
-
-        <aside class="w-64 bg-white h-screen shadow-md p-4">
-            <h1 class="text-xl font-bold text-blue-600">QualityDoc</h1>
-
-            <nav class="mt-6 space-y-2">
-                <a href="/Index" class="block p-2 bg-blue-100 text-blue-700 rounded">Dashboard</a>
-                <a href="/Documents/List" class="block p-2 hover:bg-gray-200 rounded">Documentos</a>
-            </nav>
-
-            <div class="mt-10">
-                <button onclick="abrirModal()"
-                        class="bg-blue-600 text-white px-4 py-2 rounded w-full">
-                    + Nuevo Documento
-                </button>
-            </div>
-        </aside>
-
-        <main class="flex-1 p-6">
-
-            <h2 class="text-2xl font-bold mb-2">Gestión de Documentos</h2>
-            <p class="text-gray-500 mb-4">Empresa: @ViewData["Empresa"]</p>
-
-            <div class="bg-white rounded shadow">
-                <table class="w-full">
-                    <thead class="bg-gray-200">
-                        <tr>
-                            <th class="p-3 text-left">Título</th>
-                            <th class="p-3">Versión</th>
-                            <th class="p-3">Estado</th>
-                            <th class="p-3">Sync</th>
-                            <th class="p-3">Acción</th>
-                        </tr>
-                    </thead>
-
-                    <tbody>
-                        @foreach (var doc in Model.Documentos)
-                        {
-                            <tr class="border-t">
-                                <td class="p-3">
-                                    <b>@doc.Title</b><br />
-                                    <span class="text-gray-500 text-sm">@doc.Description</span>
-                                </td>
-
-                                <td class="p-3 text-center">
-                                    v@doc.VersionNumber
-                                </td>
-
-                                <td class="p-3 text-center">
-                                    @doc.StatusId
-                                </td>
-
-                                <td class="p-3 text-center">
-                                    @(doc.SyncFirebase ? "✔" : "❌")
-                                </td>
-
-                                <td class="p-3 text-center">
-                                    @if (!doc.SyncFirebase)
-                                    {
-                                        <form method="post" asp-page-handler="Sync">
-                                            <input type="hidden" name="id" value="@doc.Id" />
-                                            <button class="bg-green-500 text-white px-2 py-1 rounded">
-                                                Sync
-                                            </button>
-                                        </form>
-                                    }
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-
-        </main>
-
-    </div>
-
-    <div id="modalCreate" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-50">
-
-        <div class="bg-white w-full max-w-2xl rounded-xl p-6">
-
-            <h2 class="text-xl font-bold mb-4">Subir Documento</h2>
-
-            <form method="post" enctype="multipart/form-data" asp-page-handler="Create">
-
-                <div class="mb-3">
-                    <label>Título</label>
-                    <input asp-for="Title" class="w-full border p-2 rounded" required />
-                </div>
-
-                <div class="mb-3">
-                    <label>Descripción</label>
-                    <textarea asp-for="Description" class="w-full border p-2 rounded"></textarea>
-                </div>
-
-                <div class="mb-3">
-                    <label>Archivo</label>
-                    <input type="file" asp-for="File" class="w-full border p-2 rounded" required />
-                </div>
-
-                <label>
-                    <input type="checkbox" asp-for="EsNuevaVersion" />
-                    Es nueva versión
-                </label>
-
-                <div class="mt-2">
-                    <input asp-for="CodigoExistente" class="w-full border p-2 rounded" placeholder="Código existente" />
-                </div>
-
-                <div class="flex justify-end gap-2 mt-4">
-                    <button type="button" onclick="cerrarModal()" class="px-4 py-2 border rounded">
-                        Cancelar
-                    </button>
-
-                    <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded">
-                        Guardar
-                    </button>
-                </div>
-
-            </form>
-
+    <div class="flex justify-between items-end">
+        <div>
+            <h2 class="text-xl font-semibold">Gestión de Documentos</h2>
+            <p class="text-gray-500 text-xs">Administra, sincroniza y aprueba documentos</p>
         </div>
 
+        <button onclick="openModal()"
+                class="bg-blue-600 text-white px-4 py-2 rounded-lg text-xs flex items-center gap-2 hover:bg-blue-700">
+            <span class="material-symbols-outlined text-[16px]">add</span>
+            Nuevo Documento
+        </button>
     </div>
-    <script>
-        function abrirModal() {
+
+    <div class="bg-white p-3 rounded-lg border flex items-center gap-3">
+        <span class="material-symbols-outlined text-gray-400 text-[18px]">search</span>
+
+        <input type="text"
+               placeholder="Buscar documentos..."
+               class="w-full text-sm outline-none" />
+    </div>
+
+    <div class="bg-white rounded-lg border overflow-hidden">
+
+        <table class="w-full text-sm">
+
+            <thead class="bg-gray-50 text-xs text-gray-500">
+                <tr>
+                    <th class="p-3 text-left">Código</th>
+                    <th class="p-3 text-left">Versión</th>
+                    <th class="p-3 text-left">Estado</th>
+                    <th class="p-3 text-left">Sync</th>
+                    <th class="p-3 text-left">Autor</th>
+                    <th class="p-3 text-left">Descripción</th>
+                    <th class="p-3 text-right">Acción</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+                @foreach (var doc in Model.Documentos)
+                {
+                    <tr class="border-t hover:bg-gray-50">
+
+                        <td class="p-3 font-medium">@doc.DocumentCode</td>
+                        <td class="p-3">v@doc.VersionNumber</td>
+
+                        <td class="p-3">
+                            @{
+                                string estado = doc.StatusId switch
+                                {
+                                    1 => "Borrador",
+                                    2 => "Aprobado",
+                                    3 => "En Revisión",
+                                    4 => "Rechazado",
+                                    _ => "Desconocido"
+                                };
+                            }
+                            <span class="px-2 py-1 rounded text-xs bg-gray-100">@estado</span>
+                        </td>
+
+                        <td class="p-3">
+                            @if (doc.SyncFirebase)
+                            {
+                                <span class="text-green-600 text-xs">✔ Firebase</span>
+                            }
+                            else
+                            {
+                                <span class="text-red-600 text-xs">❌ Firebase</span>
+                            }
+                        </td>
+
+                        <td class="p-3 text-gray-500">@doc.AuthorId</td>
+
+                        <td class="p-3 text-gray-500 max-w-[250px] truncate">@doc.Description</td>
+
+                        <td class="p-3 text-right space-x-2">
+
+                            @if (!doc.SyncFirebase)
+                            {
+                                <form method="post" asp-page-handler="Sync" class="inline">
+                                    <input type="hidden" name="id" value="@doc.Id" />
+                                    <button class="bg-blue-600 text-white px-3 py-1 rounded text-xs hover:bg-blue-700">
+                                        Firebase
+                                    </button>
+                                </form>
+                            }
+
+                            @if (!doc.SyncPostgre)
+                            {
+                                <button class="bg-purple-600 text-white px-3 py-1 rounded text-xs hover:bg-purple-700">
+                                    Postgre
+                                </button>
+                            }
+
+                        </td>
+                    </tr>
+                }
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+<div id="modalCreate"
+     class="fixed inset-0 bg-black/40 hidden items-center justify-center z-50">
+
+    <div class="bg-white w-full max-w-2xl rounded-xl shadow-lg p-6 relative">
+
+        <button onclick="closeModal()"
+                class="absolute top-3 right-3 text-gray-400 hover:text-gray-600">
+            ✖
+        </button>
+
+        <h2 class="text-lg font-semibold mb-4">Subir Documento</h2>
+
+        <form method="post"
+              enctype="multipart/form-data"
+              asp-page="/Documents/Create"
+              class="space-y-4">
+
+            <div>
+                <label class="text-xs text-gray-600">Archivo</label>
+                <input name="File" type="file"
+                       class="w-full border rounded px-3 py-2 text-sm" required />
+            </div>
+
+            <div>
+                <label class="text-xs text-gray-600">Título</label>
+                <input name="Title"
+                       class="w-full border rounded px-3 py-2 text-sm" required />
+            </div>
+
+            <div>
+                <label class="text-xs text-gray-600">Descripción</label>
+                <textarea name="Description"
+                          class="w-full border rounded px-3 py-2 text-sm"></textarea>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <input name="EsNuevaVersion" type="checkbox" />
+                <label class="text-sm">Es nueva versión</label>
+            </div>
+
+            <div>
+                <label class="text-xs text-gray-600">Código documento existente</label>
+                <input name="CodigoExistente"
+                       class="w-full border rounded px-3 py-2 text-sm" />
+            </div>
+
+            <div class="flex justify-end gap-3 pt-4">
+                <button type="button"
+                        onclick="closeModal()"
+                        class="px-4 py-2 border rounded text-sm">
+                    Cancelar
+                </button>
+
+                <button type="submit"
+                        class="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">
+                    Guardar
+                </button>
+            </div>
+
+        </form>
+
+    </div>
+</div>
+
+<script>
+    function openModal() {
         document.getElementById("modalCreate").classList.remove("hidden");
         document.getElementById("modalCreate").classList.add("flex");
-        }
+    }
 
-        function cerrarModal() {
+    function closeModal() {
         document.getElementById("modalCreate").classList.add("hidden");
-        }
-    </script>
-
-</body>
-</html>
+        document.getElementById("modalCreate").classList.remove("flex");
+    }
+</script>

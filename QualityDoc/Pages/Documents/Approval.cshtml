@@ -1,0 +1,75 @@
+﻿@page
+@model QualityDoc.Pages.Documents.ApprovalModel
+@{
+    ViewData["Title"] = "Aprobaciones";
+}
+
+<div class="p-6 max-w-7xl mx-auto grid grid-cols-5 gap-6">
+
+    <div class="col-span-3 bg-white border rounded-xl flex items-center justify-center h-[600px]">
+        <span class="text-gray-400">Vista previa del documento (pendiente)</span>
+    </div>
+
+    <div class="col-span-2 space-y-4">
+
+        <div class="bg-white p-4 rounded-xl border">
+            <h3 class="font-semibold mb-3">Información del Documento</h3>
+
+            @if (Model.Documento != null)
+            {
+                <div class="space-y-2 text-sm">
+                    <p><b>Título:</b> @Model.Documento.Title</p>
+                    <p><b>Descripción:</b> @Model.Documento.Description</p>
+                    <p><b>Código:</b> @Model.Documento.DocumentCode</p>
+                    <p><b>Versión:</b> v@Model.Documento.VersionNumber</p>
+                    <p><b>Autor:</b> @Model.Documento.AuthorId</p>
+                    <p><b>Empresa:</b> @Model.Documento.CompanyId</p>
+                    <p><b>Fecha:</b> @Model.Documento.CreatedAt.ToString("dd/MM/yyyy")</p>
+                    <p><b>Status:</b> @Model.Documento.StatusId</p>
+                </div>
+            }
+        </div>
+
+        <div class="bg-white p-4 rounded-xl border space-y-3">
+
+            <h3 class="font-semibold text-sm">Sincronización</h3>
+
+            <form method="post" asp-page-handler="SyncFirebase">
+                <input type="hidden" name="id" value="@Model.Documento?.Id" />
+                <button class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700">
+                    Sync Firebase
+                </button>
+            </form>
+
+            <button class="w-full bg-purple-600 text-white py-2 rounded hover:bg-purple-700">
+                Sync Postgre (pendiente)
+            </button>
+
+            <div class="text-xs text-gray-500 mt-2">
+                Firebase: @(Model.Documento?.SyncFirebase == true ? "✔" : "❌") <br />
+                Postgre: @(Model.Documento?.SyncPostgre == true ? "✔" : "❌")
+            </div>
+
+        </div>
+
+        <div class="space-y-2">
+
+            <form method="post" asp-page-handler="Approve">
+                <input type="hidden" name="id" value="@Model.Documento?.Id" />
+                <button class="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700">
+                    Aprobar
+                </button>
+            </form>
+
+            <form method="post" asp-page-handler="Reject">
+                <input type="hidden" name="id" value="@Model.Documento?.Id" />
+                <button class="w-full border border-red-500 text-red-600 py-2 rounded hover:bg-red-50">
+                    Rechazar
+                </button>
+            </form>
+
+        </div>
+
+    </div>
+
+</div>

@@ -1,63 +1,107 @@
 ﻿@page
 @model QualityDoc.Pages.Documents.ListModel
+@{
+    ViewData["Title"] = "Mis Documentos";
+}
 
-<h2>Lista de Documentos</h2>
+<div class="p-6 max-w-7xl mx-auto space-y-4 text-sm">
 
-<table border="1">
-    <tr>
-        <th>Código</th>
-        <th>ID</th>
-        <th>Título</th>
-        <th>Descripción</th>
-        <th>Archivo</th>
-        <th>Autor</th>
-        <th>Empresa</th>
-        <th>Estado</th>
-        <th>Versión</th>
-        <th>Fecha</th>
-        <th>Sync</th>
-        <th>Acción</th>
-    </tr>
+    <div>
+        <h2 class="text-xl font-semibold">Mis Documentos</h2>
+        <p class="text-gray-500 text-xs">Listado general de documentos</p>
+    </div>
 
-    @foreach (var doc in Model.Documentos)
-    {
-        <tr>
-            <td><b>@doc.DocumentCode</b></td>
-            <td>@doc.Id</td>
-            <td>@doc.Title</td>
-            <td>@doc.Description</td>
+    <div class="bg-white rounded-lg border overflow-hidden">
 
-            <td>
-                <a href="@doc.FilePath" target="_blank">Ver</a>
-            </td>
+        <table class="w-full text-sm">
 
-            <td>@doc.AuthorId</td>
-            <td>@doc.CompanyId</td>
-            <td>@doc.StatusId</td>
+            <thead class="bg-gray-50 text-sm text-gray-600">
+                <tr>
+                    <th class="p-3 text-left">Código</th>
+                    <th class="p-3 text-left">Título</th>
+                    <th class="p-3 text-center">Versión</th>
+                    <th class="p-3 text-center">Fecha</th>
+                    <th class="p-3 text-center">Sync</th>
+                </tr>
+            </thead>
 
-            <td>
-                v@doc.VersionNumber
-                @if (doc.IsLatest)
+            <tbody>
+                @foreach (var doc in Model.Documentos)
                 {
-                    <span style="color:green;">(Actual)</span>
+                    <tr class="border-t hover:bg-gray-50 cursor-pointer transition"
+                        onclick="window.location.href='/Documents/Approval?id=@doc.Id'">
+
+                        <td class="p-3 font-medium">
+                            @doc.DocumentCode
+                        </td>
+
+                        <td class="p-3 max-w-[260px] truncate">
+                            @doc.Title
+                        </td>
+
+                        <td class="p-3 text-center">
+                            <span class="bg-gray-100 px-2 py-1 rounded text-xs">
+                                v@doc.VersionNumber
+                            </span>
+                        </td>
+
+                        <td class="p-3 text-center text-gray-500">
+                            @doc.CreatedAt.ToString("dd/MM/yyyy")
+                        </td>
+
+                        <td class="p-3 text-center">
+                            @if (doc.SyncFirebase)
+                            {
+                                <span class="bg-green-100 text-green-700 px-2 py-1 rounded text-xs">
+                                    ✔ Sync
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="bg-red-100 text-red-600 px-2 py-1 rounded text-xs">
+                                    Pendiente
+                                </span>
+                            }
+                        </td>
+
+                    </tr>
                 }
-            </td>
+            </tbody>
+        </table>
 
-            <td>@doc.CreatedAt</td>
+        <div class="p-3 flex justify-between items-center text-xs">
 
-            <td>
-                @(doc.SyncFirebase ? "✔ Sincronizado" : "❌ Pendiente")
-            </td>
+            <span>Página @Model.PageNumber de @Model.TotalPages</span>
 
-            <td>
-                @if (!doc.SyncFirebase)
+            <div class="flex gap-1">
+
+                <a asp-page="./List"
+                       asp-route-pageNumber="@(Model.PageNumber - 1)"
+                       class="px-2 py-1 border rounded
+                    @(Model.PageNumber == 1 ? "opacity-50 pointer-events-none" : "hover:bg-gray-100")">
+                    ◀
+                </a>
+
+                @for (int i = 1; i <= Model.TotalPages; i++)
                 {
-                    <form method="post" asp-page-handler="Sync">
-                        <input type="hidden" name="id" value="@doc.Id" />
-                        <button type="submit">Sincronizar</button>
-                    </form>
+                    <a asp-page="./List"
+                           asp-route-pageNumber="@i"
+                           class="px-2 py-1 border rounded
+                        @(i == Model.PageNumber ? "bg-blue-600 text-white" : "hover:bg-gray-100")">
+                        @i
+                    </a>
                 }
-            </td>
-        </tr>
-    }
-</table>
+
+                <a asp-page="./List"
+                       asp-route-pageNumber="@(Model.PageNumber + 1)"
+                       class="px-2 py-1 border rounded
+                    @(Model.PageNumber == Model.TotalPages ? "opacity-50 pointer-events-none" : "hover:bg-gray-100")">
+                    ▶
+                </a>
+
+            </div>
+        </div>
+
+    </div>
+
+</div>

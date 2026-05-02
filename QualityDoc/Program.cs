@@ -12,6 +12,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddRazorPages();
 builder.Services.AddControllers();
 builder.Services.AddSession();
+builder.Services.AddHttpClient();
 
 var app = builder.Build();
 

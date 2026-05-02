@@ -44,7 +44,6 @@ public class LoginModel : PageModel
             return Page();
         }
 
-        // Guardar sesión
         HttpContext.Session.SetInt32("UserId", usuario.Id);
         HttpContext.Session.SetString("Usuario", usuario.FullName);
         HttpContext.Session.SetString("Rol", usuario.Rol.Name);

@@ -10,33 +10,59 @@ namespace QualityDoc.Pages.Documents
     public class ListModel : PageModel
     {
         private readonly AppDbContext _context;
+        private readonly IHttpClientFactory _httpClientFactory;
 
-        public List<Documento> Documentos { get; set; }
+        public List<Documento> Documentos { get; set; } = new();
 
-        public ListModel(AppDbContext context)
+        public int PageNumber { get; set; } = 1;
+        public int TotalPages { get; set; }
+        public int PageSize { get; set; } = 10; 
+
+        public ListModel(AppDbContext context, IHttpClientFactory httpClientFactory)
         {
             _context = context;
+            _httpClientFactory = httpClientFactory;
         }
 
-        public IActionResult OnGet()
+        public IActionResult OnGet(int pageNumber = 1)
         {
-            if (HttpContext.Session.GetInt32("UserId") == null)
+            var userId = HttpContext.Session.GetInt32("UserId");
+
+            if (userId == null)
                 return RedirectToPage("/Login");
 
-            Documentos = _context.Documents.ToList();
+            PageNumber = pageNumber;
+
+            var query = _context.Documents.AsQueryable();
+
+            int totalRecords = query.Count();
+
+            TotalPages = (int)Math.Ceiling(totalRecords / (double)PageSize);
+
+            Documentos = query
+                .OrderByDescending(d => d.CreatedAt) 
+                .Skip((PageNumber - 1) * PageSize)
+                .Take(PageSize)
+                .ToList();
 
             return Page();
         }
+
         public async Task<IActionResult> OnPostSyncAsync(Guid id)
         {
+            var userId = HttpContext.Session.GetInt32("UserId");
+
+            if (userId == null)
+                return RedirectToPage("/Login");
+
             var documento = _context.Documents.FirstOrDefault(d => d.Id == id);
 
             if (documento == null)
-                return Page();
+                return RedirectToPage();
 
             var payload = new
             {
-                Id = documento.Id,
+                Id = documento.Id.ToString().ToUpper(),
                 ParentId = documento.ParentId,
                 VersionNumber = documento.VersionNumber,
                 IsLatest = documento.IsLatest,
@@ -51,27 +77,37 @@ namespace QualityDoc.Pages.Documents
                 {
                     fileSize = "N/A",
                     pages = 0,
-                    keywords = new string[] { },
                     checksum = "N/A"
                 }
             };
 
-            var client = new HttpClient();
-
-            var response = await client.PostAsJsonAsync("http://localhost:3000/api/documents", payload);
-
-            if (response.IsSuccessStatusCode)
+            try
             {
-                documento.SyncFirebase = true;
-                _context.SaveChanges();
+                var client = _httpClientFactory.CreateClient();
+
+                var response = await client.PostAsJsonAsync(
+                    "http://localhost:3000/api/documents",
+                    payload
+                );
+
+                if (response.IsSuccessStatusCode)
+                {
+                    documento.SyncFirebase = true;
+                    documento.LastErrorLog = null;
+                }
+                else
+                {
+                    documento.LastErrorLog = await response.Content.ReadAsStringAsync();
+                }
             }
-            else
+            catch (Exception ex)
             {
-                documento.LastErrorLog = await response.Content.ReadAsStringAsync();
-                _context.SaveChanges();
+                documento.LastErrorLog = ex.Message;
             }
 
-            return RedirectToPage();
+            await _context.SaveChangesAsync();
+
+            return RedirectToPage(new { pageNumber = PageNumber }); 
         }
     }
 }
