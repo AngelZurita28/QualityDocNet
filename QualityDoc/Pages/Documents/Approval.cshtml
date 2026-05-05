@@ -1,4 +1,4 @@
-﻿@page
+@page
 @model QualityDoc.Pages.Documents.ApprovalModel
 @{
     ViewData["Title"] = "Aprobaciones";
@@ -6,70 +6,372 @@
 
 <div class="p-6 max-w-7xl mx-auto grid grid-cols-5 gap-6">
 
-    <div class="col-span-3 bg-white border rounded-xl flex items-center justify-center h-[600px]">
-        <span class="text-gray-400">Vista previa del documento (pendiente)</span>
+    <div class="col-span-3 bg-gray-50 border rounded-xl overflow-hidden shadow-sm h-[700px] flex flex-col relative">
+        @if (Model.Documento != null && !string.IsNullOrEmpty(Model.Documento.FilePath))
+        {
+            var ext = System.IO.Path.GetExtension(Model.Documento.FilePath).ToLower();
+            var isPdf = ext == ".pdf";
+            var isImage = ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".gif" || ext == ".webp";
+            var isOffice = ext == ".doc" || ext == ".docx" || ext == ".xls" || ext == ".xlsx" || ext == ".ppt" || ext == ".pptx";
+            
+            <div class="bg-white p-3 border-b flex justify-between items-center shadow-sm z-10">
+                <div class="flex items-center gap-2 overflow-hidden">
+                    <span class="material-symbols-outlined text-blue-500 text-[20px]">description</span>
+                    <span class="text-xs font-bold text-gray-700 truncate max-w-[250px]" title="@System.IO.Path.GetFileName(Model.Documento.FilePath)">
+                        @System.IO.Path.GetFileName(Model.Documento.FilePath)
+                    </span>
+                    <span class="bg-gray-100 text-gray-500 px-2 py-0.5 rounded text-[10px] font-mono uppercase border">@ext.Replace(".", "")</span>
+                </div>
+                <a href="@Model.Documento.FilePath" download class="bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 flex-shrink-0">
+                    <span class="material-symbols-outlined text-[16px]">download</span> Descargar Original
+                </a>
+            </div>
+
+            <div class="flex-1 bg-gray-200/50 flex items-center justify-center relative w-full h-full overflow-hidden">
+                @if (isPdf)
+                {
+                    <iframe src="@Model.Documento.FilePath#toolbar=0&navpanes=0" class="w-full h-full border-0 shadow-inner"></iframe>
+                }
+                else if (isImage)
+                {
+                    <div class="w-full h-full p-6 flex items-center justify-center overflow-auto">
+                        <img src="@Model.Documento.FilePath" class="max-w-full max-h-full object-contain shadow-md border rounded bg-white" alt="Vista previa del documento" />
+                    </div>
+                }
+                else if (isOffice)
+                {
+                    <div class="text-center p-8 bg-white rounded-xl shadow-sm border border-gray-200 max-w-sm m-4">
+                        <div class="w-16 h-16 mx-auto mb-4 bg-blue-50 rounded-full flex items-center justify-center text-blue-600">
+                            <span class="material-symbols-outlined text-4xl">edit_document</span>
+                        </div>
+                        <h4 class="text-lg font-bold text-gray-800 mb-2">Documento de Office</h4>
+                        <p class="text-sm text-gray-500 mb-6">Para visualizar o editar este archivo de Word/Excel/PowerPoint sin perder formato, debes descargarlo a tu equipo.</p>
+                        <a href="@Model.Documento.FilePath" download class="inline-flex items-center justify-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-lg font-medium shadow hover:bg-blue-700 transition w-full">
+                            <span class="material-symbols-outlined">download</span>
+                            Descargar @ext.ToUpper()
+                        </a>
+                    </div>
+                }
+                else
+                {
+                    <div class="text-center p-8">
+                        <span class="material-symbols-outlined text-6xl text-gray-300 mb-3 drop-shadow-sm">unknown_document</span>
+                        <h4 class="text-gray-700 font-medium mb-1">Formato de archivo no soportado</h4>
+                        <p class="text-sm text-gray-500 mb-4">No podemos mostrar una vista previa de los archivos @ext en el navegador.</p>
+                        <a href="@Model.Documento.FilePath" download class="bg-white border shadow-sm text-gray-700 px-5 py-2 rounded-lg hover:bg-gray-50 font-medium text-sm transition inline-flex items-center gap-2">
+                            <span class="material-symbols-outlined text-[18px]">download</span>
+                            Descargar Archivo
+                        </a>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="flex-1 flex flex-col items-center justify-center text-gray-400 p-8">
+                <span class="material-symbols-outlined text-6xl mb-3 opacity-50">broken_image</span>
+                <span class="text-lg font-medium text-gray-500">Archivo no encontrado</span>
+                <span class="text-sm mt-1 text-center max-w-xs">El archivo físico no se subió correctamente o fue eliminado del servidor.</span>
+            </div>
+        }
     </div>
 
     <div class="col-span-2 space-y-4">
 
-        <div class="bg-white p-4 rounded-xl border">
-            <h3 class="font-semibold mb-3">Información del Documento</h3>
+        <div class="bg-white p-5 rounded-xl border shadow-sm">
+            <h3 class="font-bold text-lg mb-4 text-gray-800 flex items-center gap-2 border-b pb-3">
+                <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                Información del Documento
+            </h3>
 
             @if (Model.Documento != null)
             {
-                <div class="space-y-2 text-sm">
-                    <p><b>Título:</b> @Model.Documento.Title</p>
-                    <p><b>Descripción:</b> @Model.Documento.Description</p>
-                    <p><b>Código:</b> @Model.Documento.DocumentCode</p>
-                    <p><b>Versión:</b> v@Model.Documento.VersionNumber</p>
-                    <p><b>Autor:</b> @Model.Documento.AuthorId</p>
-                    <p><b>Empresa:</b> @Model.Documento.CompanyId</p>
-                    <p><b>Fecha:</b> @Model.Documento.CreatedAt.ToString("dd/MM/yyyy")</p>
-                    <p><b>Status:</b> @Model.Documento.StatusId</p>
+                <div class="flex flex-col gap-4 text-sm">
+                    <div>
+                        <p class="text-[10px] text-gray-400 uppercase tracking-wider font-bold mb-0.5">Título</p>
+                        <p class="font-bold text-gray-800 text-base leading-tight">@Model.Documento.Title</p>
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(Model.Documento.Description))
+                    {
+                        <div>
+                            <p class="text-[10px] text-gray-400 uppercase tracking-wider font-bold mb-0.5">Descripción</p>
+                            <p class="text-gray-600 text-sm">@Model.Documento.Description</p>
+                        </div>
+                    }
+
+                    <div class="grid grid-cols-2 gap-4 bg-gray-50 p-3 rounded-lg border border-gray-100">
+                        <div>
+                            <p class="text-[10px] text-gray-400 uppercase font-bold mb-0.5">Código</p>
+                            <p class="font-mono text-sm font-semibold text-gray-700">@Model.Documento.DocumentCode</p>
+                        </div>
+                        <div>
+                            <p class="text-[10px] text-gray-400 uppercase font-bold mb-0.5">Versión</p>
+                            <span class="text-xs font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-md inline-block">v@(Model.Documento.VersionNumber)</span>
+                            @if (Model.Documento.ParentId != null)
+                            {
+                                <span class="ml-2 text-[10px] text-gray-400 font-medium">(Actualización)</span>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4 mt-1">
+                        <div>
+                            <p class="text-[10px] text-gray-400 uppercase tracking-wider font-bold mb-1">Autor</p>
+                            <div class="flex items-center gap-2">
+                                <div class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-bold shadow-sm">
+                                    @(Model.Documento.Author?.FullName?.Substring(0, 1).ToUpper() ?? "?")
+                                </div>
+                                <p class="text-gray-700 font-medium text-sm">@Model.Documento.Author?.FullName</p>
+                            </div>
+                        </div>
+                        <div>
+                            <p class="text-[10px] text-gray-400 uppercase tracking-wider font-bold mb-1">Empresa</p>
+                            <p class="text-gray-700 font-medium text-sm flex items-center gap-1">
+                                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+                                @Model.Documento.Company?.Name
+                            </p>
+                        </div>
+                    </div>
+
+                    <hr class="border-gray-100 my-1" />
+
+                    <div class="flex justify-between items-center bg-white">
+                        <div>
+                            <p class="text-[10px] text-gray-400 uppercase tracking-wider font-bold mb-0.5">Estado</p>
+                            <div class="flex items-center gap-1.5">
+                                <span class="relative flex h-2.5 w-2.5">
+                                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                                  <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-500"></span>
+                                </span>
+                                <p class="text-gray-800 font-bold text-sm">@Model.Documento.Status?.Name</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-[10px] text-gray-400 uppercase tracking-wider font-bold mb-0.5">Creado el</p>
+                            <p class="text-gray-600 text-xs font-medium">@Model.Documento.CreatedAt.ToString("dd MMM yyyy, HH:mm")</p>
+                        </div>
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(Model.Documento.LastErrorLog))
+                    {
+                        <div class="p-3 bg-red-50 border border-red-100 rounded-lg mt-2">
+                            <p class="text-[10px] text-red-500 uppercase font-bold flex items-center gap-1">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                Registro de Error
+                            </p>
+                            <p class="text-xs text-red-700 mt-1 break-words">@Model.Documento.LastErrorLog</p>
+                        </div>
+                    }
                 </div>
             }
         </div>
 
         <div class="bg-white p-4 rounded-xl border space-y-3">
 
-            <h3 class="font-semibold text-sm">Sincronización</h3>
+            <h3 class="font-semibold text-sm">Panel de Sincronización</h3>
 
-            <form method="post" asp-page-handler="SyncFirebase">
-                <input type="hidden" name="id" value="@Model.Documento?.Id" />
-                <button class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700">
-                    Sync Firebase
-                </button>
-            </form>
+            <div class="flex flex-col gap-2">
+                @if (Model.Documento?.StatusId == 3)
+                {
+                    <form method="post" asp-page-handler="SyncFirebase">
+                        <input type="hidden" name="id" value="@Model.Documento?.Id" />
+                        <button class="w-full bg-orange-600 text-white py-2 rounded hover:bg-orange-700 font-medium transition flex items-center justify-center gap-2">
+                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"></path></svg>
+                            Sincronizar Firebase
+                        </button>
+                    </form>
 
-            <button class="w-full bg-purple-600 text-white py-2 rounded hover:bg-purple-700">
-                Sync Postgre (pendiente)
-            </button>
+                    <button class="w-full bg-blue-800 text-white py-2 rounded opacity-50 cursor-not-allowed font-medium transition flex items-center justify-center gap-2" title="Pendiente implementar en PHP">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path></svg>
+                        Sincronizar Postgre (Pendiente)
+                    </button>
+                }
+                else
+                {
+                    <div class="w-full text-center p-2 bg-gray-50 border border-gray-100 rounded text-gray-500 font-medium text-xs">
+                        Solo los documentos aprobados pueden sincronizarse.
+                    </div>
+                }
 
-            <div class="text-xs text-gray-500 mt-2">
-                Firebase: @(Model.Documento?.SyncFirebase == true ? "✔" : "❌") <br />
-                Postgre: @(Model.Documento?.SyncPostgre == true ? "✔" : "❌")
+                @if (!string.IsNullOrEmpty(Model.Documento?.LastErrorLog))
+                {
+                    <div class="mt-2 p-3 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+                        <strong class="block mb-1 flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">warning</span> Error de Sincronización:</strong>
+                        <div class="break-words font-mono text-[10px]">@Model.Documento.LastErrorLog</div>
+                    </div>
+                }
             </div>
 
         </div>
 
-        <div class="space-y-2">
+        <div class="flex gap-2">
+            @if (Model.Documento != null)
+            {
+                @if (Model.Documento.StatusId == 1 || Model.Documento.StatusId == 4)
+                {
+                    if (Model.CurrentUserId == Model.Documento.AuthorId)
+                    {
+                        <form method="post" asp-page-handler="SendReview" class="flex-1">
+                            <input type="hidden" name="id" value="@Model.Documento.Id" />
+                            <button class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 font-medium shadow-sm">
+                                Enviar a Revisión
+                            </button>
+                        </form>
+                    }
+                    else
+                    {
+                        <div class="w-full text-center p-2 bg-gray-50 rounded text-gray-500 font-medium text-sm">El autor aún está trabajando en este documento.</div>
+                    }
+                }
+                else if (Model.Documento.StatusId == 2)
+                {
+                    if (Model.CurrentUserId == Model.Documento.AuthorId)
+                    {
+                        <div class="w-full text-center p-2 bg-yellow-50 rounded text-yellow-700 font-medium text-sm">Esperando aprobación de otro usuario.</div>
+                    }
+                    else if (Model.CanApprove)
+                    {
+                        <form method="post" asp-page-handler="Approve" class="flex-1">
+                            <input type="hidden" name="id" value="@Model.Documento.Id" />
+                            <button class="w-full bg-green-700 text-white py-2 rounded hover:bg-green-800 font-medium shadow-sm">
+                                Aprobar
+                            </button>
+                        </form>
 
-            <form method="post" asp-page-handler="Approve">
-                <input type="hidden" name="id" value="@Model.Documento?.Id" />
-                <button class="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700">
-                    Aprobar
-                </button>
-            </form>
-
-            <form method="post" asp-page-handler="Reject">
-                <input type="hidden" name="id" value="@Model.Documento?.Id" />
-                <button class="w-full border border-red-500 text-red-600 py-2 rounded hover:bg-red-50">
-                    Rechazar
-                </button>
-            </form>
-
+                        <button type="button" onclick="document.getElementById('rejectModal').classList.remove('hidden'); document.getElementById('rejectModal').classList.add('flex');" class="w-full border border-red-500 text-red-600 py-2 rounded hover:bg-red-50 font-medium flex-1">
+                            Rechazar
+                        </button>
+                    }
+                    else
+                    {
+                        <div class="w-full text-center p-2 bg-red-50 rounded text-red-600 font-medium text-sm">No tienes permisos para aprobar este documento.</div>
+                    }
+                }
+                else if (Model.Documento.StatusId == 2)
+                {
+                    <div class="w-full text-center p-2 bg-green-50 rounded text-green-700 font-bold text-sm">Documento Aprobado</div>
+                }
+            }
         </div>
 
     </div>
 
+</div>
+
+<!-- Versiones Anteriores -->
+@if (Model.VersionesAnteriores != null && Model.VersionesAnteriores.Any())
+{
+    <div class="mt-8 bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden max-w-7xl mx-auto">
+        <div class="bg-gray-50 border-b border-gray-200 px-6 py-4">
+            <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                <span class="material-symbols-outlined text-gray-500">source_notes</span>
+                Versiones Anteriores
+            </h3>
+            <p class="text-xs text-gray-500 mt-1">Historial de versiones pasadas de este documento (solo lectura).</p>
+        </div>
+        
+        <table class="w-full text-sm text-left">
+            <thead class="bg-white text-xs text-gray-600 uppercase font-semibold border-b border-gray-200">
+                <tr>
+                    <th class="px-6 py-3">Versión</th>
+                    <th class="px-6 py-3">Fecha de Creación</th>
+                    <th class="px-6 py-3">Estado</th>
+                    <th class="px-6 py-3 text-right">Acción</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                @foreach (var v in Model.VersionesAnteriores)
+                {
+                    <tr class="hover:bg-gray-50 transition">
+                        <td class="px-6 py-3 font-medium text-gray-800">v@(v.VersionNumber)</td>
+                        <td class="px-6 py-3 text-gray-500">@v.CreatedAt.ToString("dd MMM yyyy, HH:mm")</td>
+                        <td class="px-6 py-3">
+                            <span class="px-2 py-1 rounded text-[10px] uppercase tracking-wider font-bold @(v.StatusId == 2 ? "bg-green-100 text-green-700" : v.StatusId == 4 ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-600")">
+                                @(v.StatusId == 2 ? "Aprobado" : v.StatusId == 4 ? "Rechazado" : "Borrador")
+                            </span>
+                        </td>
+                        <td class="px-6 py-3 text-right">
+                            <a asp-page="/Documents/Approval" asp-route-id="@v.Id" class="text-blue-600 hover:text-blue-800 hover:underline font-medium text-xs">
+                                Ver Detalles
+                            </a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+<!-- Historial de Auditoría -->
+<div class="mt-8 bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden max-w-7xl mx-auto">
+    <div class="bg-gray-50 border-b border-gray-200 px-6 py-4">
+        <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+            <span class="material-symbols-outlined text-gray-500">history</span>
+            Auditoría y Trazabilidad
+        </h3>
+        <p class="text-xs text-gray-500 mt-1">Historial completo de intervenciones sobre este documento.</p>
+    </div>
+    
+    @if (Model.Historial != null && Model.Historial.Any())
+    {
+        <div class="p-6">
+            <div class="space-y-6 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-slate-300 before:to-transparent">
+                @foreach (var item in Model.Historial)
+                {
+                    <div class="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
+                        <!-- Icon -->
+                        <div class="flex items-center justify-center w-10 h-10 rounded-full border border-white bg-slate-300 group-[.is-active]:bg-blue-500 text-white group-[.is-active]:text-white shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10">
+                            <span class="material-symbols-outlined text-sm">
+                                @(item.Action.Contains("Creado") ? "add_circle" : 
+                                  item.Action.Contains("Revisión") ? "visibility" : 
+                                  item.Action.Contains("Aprobado") ? "check_circle" : 
+                                  "cancel")
+                            </span>
+                        </div>
+                        <!-- Card -->
+                        <div class="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-white border border-gray-200 p-4 rounded-xl shadow-sm">
+                            <div class="flex items-center justify-between space-x-2 mb-1">
+                                <div class="font-bold text-slate-900 text-sm">@item.Action</div>
+                                <time class="font-caveat font-medium text-blue-600 text-xs">@item.ActionDate.ToString("dd MMM yyyy, HH:mm")</time>
+                            </div>
+                            <div class="text-slate-500 text-xs mb-2">Por <span class="font-semibold text-gray-700">@item.User?.FullName</span></div>
+                            <div class="text-slate-600 text-xs italic bg-gray-50 p-2 rounded">"@item.Comment"</div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="p-8 text-center text-gray-500 text-sm">
+            No hay registros de auditoría para este documento.
+        </div>
+    }
+</div>
+
+<!-- Modal de Rechazo -->
+<div id="rejectModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-[100] backdrop-blur-sm">
+    <div class="bg-white w-full max-w-lg rounded-2xl shadow-2xl p-6 animate-in zoom-in duration-200">
+        <h3 class="text-xl font-bold text-gray-800 mb-2 flex items-center gap-2">
+            <span class="material-symbols-outlined text-red-500">cancel</span>
+            Motivo de Rechazo
+        </h3>
+        <p class="text-sm text-gray-500 mb-4">Por favor, explica detalladamente por qué se rechaza este documento. Este comentario será visible para el autor.</p>
+        
+        <form method="post" asp-page-handler="Reject">
+            <input type="hidden" name="id" value="@Model.Documento?.Id" />
+            <textarea name="rejectionComment" rows="4" class="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-red-500 focus:outline-none resize-none mb-4" placeholder="Ej: Faltan las firmas en la página 3 y el formato no cumple el estándar..." required></textarea>
+            
+            <div class="flex justify-end gap-3">
+                <button type="button" onclick="document.getElementById('rejectModal').classList.add('hidden'); document.getElementById('rejectModal').classList.remove('flex');" class="px-4 py-2 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition">
+                    Cancelar
+                </button>
+                <button type="submit" class="px-4 py-2 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition shadow-sm">
+                    Confirmar Rechazo
+                </button>
+            </div>
+        </form>
+    </div>
 </div>

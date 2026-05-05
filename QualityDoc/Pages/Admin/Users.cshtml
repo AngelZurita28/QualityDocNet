@@ -1,0 +1,117 @@
+@page
+@model QualityDoc.Pages.Admin.UsersModel
+@{
+    ViewData["Title"] = "Gestión de Usuarios";
+}
+
+<div class="p-6 max-w-7xl mx-auto space-y-6">
+
+    <div class="flex items-center justify-between">
+        <div>
+            <h2 class="text-2xl font-bold text-gray-800">Gestión de Usuarios</h2>
+            <p class="text-sm text-gray-500 mt-1">Administra los roles, empresas y accesos del sistema.</p>
+        </div>
+        <a asp-page="/Register" class="bg-blue-600 text-white px-4 py-2 rounded-xl font-medium text-sm hover:bg-blue-700 transition flex items-center gap-2 shadow-sm">
+            <span class="material-symbols-outlined text-[18px]">person_add</span>
+            Nuevo Usuario
+        </a>
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.MensajeExito))
+    {
+        <div class="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl flex items-center gap-2 text-sm font-medium">
+            <span class="material-symbols-outlined text-[18px]">check_circle</span>
+            @Model.MensajeExito
+        </div>
+    }
+
+    <div class="bg-white rounded-2xl border shadow-sm overflow-hidden">
+        <table class="w-full text-sm text-left">
+            <thead class="bg-gray-50 text-xs text-gray-600 uppercase font-semibold">
+                <tr>
+                    <th class="px-6 py-4">Usuario / Email</th>
+                    <th class="px-6 py-4">Rol Asignado</th>
+                    <th class="px-6 py-4">Empresa</th>
+                    <th class="px-6 py-4 text-center">Estado</th>
+                    <th class="px-6 py-4 text-right">Acciones</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                @foreach (var u in Model.Usuarios)
+                {
+                    <tr class="hover:bg-gray-50/50 transition">
+                        <td class="px-6 py-4">
+                            <div class="flex items-center gap-3">
+                                <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold shadow-sm text-xs">
+                                    @(u.FullName?.Substring(0, 1).ToUpper() ?? "?")
+                                </div>
+                                <div>
+                                    <p class="font-bold text-gray-800">@u.FullName</p>
+                                    <p class="text-xs text-gray-500">@u.Email</p>
+                                </div>
+                            </div>
+                        </td>
+                        
+                        <form method="post" asp-page-handler="UpdateUser">
+                            <input type="hidden" name="userId" value="@u.Id" />
+                            
+                            <td class="px-6 py-4">
+                                <select name="roleId" class="border border-gray-200 rounded-lg px-3 py-1.5 text-xs text-gray-700 bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none w-full" asp-items="Model.RolesList">
+                                    <option value="@u.RoleId" selected hidden>@u.Rol?.Name</option>
+                                </select>
+                            </td>
+
+                            <td class="px-6 py-4">
+                                <select name="companyId" class="border border-gray-200 rounded-lg px-3 py-1.5 text-xs text-gray-700 bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none w-full" asp-items="Model.CompaniesList">
+                                    <option value="@u.CompanyId" selected hidden>@u.Company?.Name</option>
+                                </select>
+                            </td>
+
+                            <td class="px-6 py-4 text-center">
+                                <select name="isActive" class="border border-gray-200 rounded-lg px-3 py-1.5 text-xs bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none @(u.IsActive ? "text-green-700 font-medium" : "text-red-600 font-medium")">
+                                    @if(u.IsActive)
+                                    {
+                                        <option value="true" selected>Activo</option>
+                                        <option value="false">Inactivo</option>
+                                    }
+                                    else
+                                    {
+                                        <option value="true">Activo</option>
+                                        <option value="false" selected>Inactivo</option>
+                                    }
+                                </select>
+                            </td>
+
+                            <td class="px-6 py-4 text-right">
+                                <button type="submit" class="bg-white border border-gray-200 text-gray-700 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition">
+                                    Guardar
+                                </button>
+                            </td>
+                        </form>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <!-- Paginación -->
+        @if (Model.TotalPages > 1)
+        {
+            <div class="px-6 py-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between">
+                <p class="text-xs text-gray-500">Mostrando página @Model.PageNumber de @Model.TotalPages</p>
+                <div class="flex gap-1">
+                    @for (int i = 1; i <= Model.TotalPages; i++)
+                    {
+                        if (i == Model.PageNumber)
+                        {
+                            <span class="px-3 py-1 bg-blue-600 text-white rounded-lg text-xs font-medium shadow-sm">@i</span>
+                        }
+                        else
+                        {
+                            <a asp-page="/Admin/Users" asp-route-pageNumber="@i" class="px-3 py-1 bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 rounded-lg text-xs font-medium transition">@i</a>
+                        }
+                    }
+                </div>
+            </div>
+        }
+    </div>
+</div>

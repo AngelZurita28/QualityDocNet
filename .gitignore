@@ -10,7 +10,7 @@
 *.userosscache
 *.sln.docstates
 
-wwwroot/uploads/
+**/wwwroot/uploads/
 *.json
 
 # User-specific files (MonoDevelop/Xamarin Studio)

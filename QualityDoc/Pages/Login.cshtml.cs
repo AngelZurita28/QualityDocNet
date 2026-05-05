@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using QualityDoc.Data;
@@ -27,12 +27,13 @@ public class LoginModel : PageModel
 
     public IActionResult OnPost()
     {
-        Correo = Correo?.Trim();
+        Correo = Correo?.Trim().ToLower();
 
         var hash = PasswordHelper.HashPassword(Password);
 
         var usuario = _context.Users
              .Include(u => u.Rol)
+             .Include(u => u.Company)
              .FirstOrDefault(u => u.Email == Correo
                       && u.PasswordHash == hash
                       && u.IsActive);
@@ -46,7 +47,8 @@ public class LoginModel : PageModel
 
         HttpContext.Session.SetInt32("UserId", usuario.Id);
         HttpContext.Session.SetString("Usuario", usuario.FullName);
-        HttpContext.Session.SetString("Rol", usuario.Rol.Name);
+        HttpContext.Session.SetString("Rol", usuario.Rol?.Name ?? "");
+        HttpContext.Session.SetString("Empresa", usuario.Company?.Name ?? "Sin Empresa");
 
         return RedirectToPage("/Index");
     }

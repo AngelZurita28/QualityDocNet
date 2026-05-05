@@ -1,23 +1,26 @@
-﻿using System.Security.Cryptography;
-using System.Text;
+using System.Security.Cryptography;
+using Microsoft.AspNetCore.Cryptography.KeyDerivation;
 
 namespace QualityDoc.Helpers
 {
     public static class PasswordHelper
     {
+        // Sal estática para mantener compatibilidad sin cambiar la BD
+        private static readonly byte[] StaticSalt = new byte[] { 0x48, 0x65, 0x6c, 0x6c, 0x6f, 0x57, 0x6f, 0x72, 0x6c, 0x64 };
+
         public static string HashPassword(string password)
         {
-            using (SHA256 sha256 = SHA256.Create())
-            {
-                var bytes = Encoding.UTF8.GetBytes(password);
-                var hash = sha256.ComputeHash(bytes);
+            if (string.IsNullOrEmpty(password)) return string.Empty;
 
-                var builder = new StringBuilder();
-                foreach (var b in hash)
-                    builder.Append(b.ToString("x2"));
+            byte[] hashed = KeyDerivation.Pbkdf2(
+                password: password,
+                salt: StaticSalt,
+                prf: KeyDerivationPrf.HMACSHA512,
+                iterationCount: 10000,
+                numBytesRequested: 256 / 8);
 
-                return builder.ToString();
-            }
+            return Convert.ToBase64String(hashed);
         }
     }
 }
+
