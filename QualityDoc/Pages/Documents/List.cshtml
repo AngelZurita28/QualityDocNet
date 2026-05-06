@@ -124,14 +124,45 @@
                         <td class="p-3 text-gray-600">@(doc.Company?.Name ?? "-")</td>
                         <td class="p-3 text-center text-gray-500">@doc.CreatedAt.ToString("dd/MM/yyyy")</td>
                         <td class="p-3 text-center">
-                            <span class="@(doc.SyncFirebase ? "text-green-600" : "text-gray-400")">
-                                @(doc.SyncFirebase ? "✔" : "❌")
-                            </span>
+                            @if (doc.StatusId == 3)
+                            {
+                                @if (!doc.SyncFirebase)
+                                {
+                                    <form method="post" asp-page-handler="SyncAsync" class="inline" onclick="event.stopPropagation()">
+                                        <input type="hidden" name="id" value="@doc.Id" />
+                                        <button type="submit" class="bg-blue-600 text-white px-3 py-1 rounded text-[10px] hover:bg-blue-700 transition">
+                                            Firebase
+                                        </button>
+                                    </form>
+                                }
+                                else
+                                {
+                                    <span class="text-green-600 text-[10px] font-bold">✔ Sync</span>
+                                }
+                            }
+                            else
+                            {
+                                <span class="text-gray-400 text-[10px] italic">No listo</span>
+                            }
                         </td>
                         <td class="p-3 text-center">
-                            <span class="@(doc.SyncPostgre ? "text-blue-600" : "text-gray-400")">
-                                @(doc.SyncPostgre ? "✔" : "❌")
-                            </span>
+                            @if (doc.StatusId == 3)
+                            {
+                                @if (!doc.SyncPostgre)
+                                {
+                                    <button class="bg-purple-600 text-white px-3 py-1 rounded text-[10px] hover:bg-purple-700 transition" onclick="event.stopPropagation()">
+                                        Postgre
+                                    </button>
+                                }
+                                else
+                                {
+                                    <span class="text-green-600 text-[10px] font-bold">✔ Sync</span>
+                                }
+                            }
+                            else
+                            {
+                                <span class="text-gray-400 text-[10px] italic">-</span>
+                            }
                         </td>
                     </tr>
                 }

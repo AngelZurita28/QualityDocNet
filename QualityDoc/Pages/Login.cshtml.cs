@@ -3,6 +3,11 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using QualityDoc.Data;
 using QualityDoc.Helpers;
+using QualityDoc.Pages.Models;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.Google;
+using System.Security.Claims;
 
 namespace QualityDoc.Pages; 
 
@@ -34,6 +39,7 @@ public class LoginModel : PageModel
         var usuario = _context.Users
              .Include(u => u.Rol)
              .Include(u => u.Company)
+             .Include(u => u.Department)
              .FirstOrDefault(u => u.Email == Correo
                       && u.PasswordHash == hash
                       && u.IsActive);
@@ -45,11 +51,47 @@ public class LoginModel : PageModel
             return Page();
         }
 
+        SetUserSession(usuario);
+        return RedirectToPage("/Index");
+    }
+
+    public IActionResult OnGetGoogleLogin()
+    {
+        var properties = new AuthenticationProperties { RedirectUri = Url.Page("./Login", pageHandler: "GoogleResponse") };
+        return Challenge(properties, GoogleDefaults.AuthenticationScheme);
+    }
+
+    public async Task<IActionResult> OnGetGoogleResponse()
+    {
+        var result = await HttpContext.AuthenticateAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        if (!result.Succeeded) return RedirectToPage("./Login");
+
+        var email = result.Principal.FindFirstValue(ClaimTypes.Email);
+        if (string.IsNullOrEmpty(email)) return RedirectToPage("./Login");
+
+        var usuario = await _context.Users
+            .Include(u => u.Rol)
+            .Include(u => u.Company)
+            .Include(u => u.Department)
+            .FirstOrDefaultAsync(u => u.Email == email.ToLower() && u.IsActive);
+
+        if (usuario == null)
+        {
+            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            Error = "El correo de Google no está registrado en el sistema.";
+            return Page();
+        }
+
+        SetUserSession(usuario);
+        return RedirectToPage("/Index");
+    }
+
+    private void SetUserSession(Usuario usuario)
+    {
         HttpContext.Session.SetInt32("UserId", usuario.Id);
         HttpContext.Session.SetString("Usuario", usuario.FullName);
         HttpContext.Session.SetString("Rol", usuario.Rol?.Name ?? "");
         HttpContext.Session.SetString("Empresa", usuario.Company?.Name ?? "Sin Empresa");
-
-        return RedirectToPage("/Index");
+        HttpContext.Session.SetString("Departamento", usuario.Department?.Name ?? "Sin Área");
     }
 }

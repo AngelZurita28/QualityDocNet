@@ -18,6 +18,18 @@ namespace QualityDoc.Pages.Documents
         public List<ApprovalHistory> Historial { get; set; } = new();
         public int CurrentUserId { get; set; }
         public bool CanApprove { get; set; } = false;
+        public bool CanEdit { get; set; } = false;
+
+        [BindProperty]
+        public string EditTitle { get; set; } = string.Empty;
+        [BindProperty]
+        public string EditDescription { get; set; } = string.Empty;
+        [BindProperty]
+        public IFormFile? NewFile { get; set; }
+        [BindProperty]
+        public int EditDepartmentId { get; set; }
+
+        public List<Department> DepartmentsList { get; set; } = new();
 
         public ApprovalModel(AppDbContext context, IWebHostEnvironment env)
         {
@@ -31,13 +43,23 @@ namespace QualityDoc.Pages.Documents
             if (currentUser == null || doc == null) return false;
 
             bool isAuthor = doc.AuthorId == userId;
-            bool isOperador = currentUser.Rol?.Name?.Trim().Equals("Operador", StringComparison.OrdinalIgnoreCase) == true;
-            bool isSuperAdmin = currentUser.Rol?.Name?.Trim().Equals("SuperAdmin", StringComparison.OrdinalIgnoreCase) == true 
-                             || currentUser.Rol?.Name?.Trim().Equals("Super Admin", StringComparison.OrdinalIgnoreCase) == true
-                             || currentUser.Rol?.Name?.Trim().Equals("Súperadmin", StringComparison.OrdinalIgnoreCase) == true;
+            string rolName = currentUser.Rol?.Name?.Trim() ?? "";
+
+            bool isAdmin = rolName.Equals("Admin", StringComparison.OrdinalIgnoreCase) || 
+                           rolName.Equals("Administrador", StringComparison.OrdinalIgnoreCase);
+
+            bool isSuperAdmin = rolName.Equals("SuperAdmin", StringComparison.OrdinalIgnoreCase) || 
+                                rolName.Equals("Super Admin", StringComparison.OrdinalIgnoreCase) ||
+                                rolName.Equals("Súperadmin", StringComparison.OrdinalIgnoreCase);
+
             bool isSameCompany = doc.CompanyId == currentUser.CompanyId;
 
-            return !isAuthor && !isOperador && (isSameCompany || isSuperAdmin);
+            // El autor NUNCA puede aprobar su propio documento.
+            // Solo Admins de la misma empresa o SuperAdmins globales pueden aprobar.
+            // Esto excluye automáticamente al rol "Operador".
+            if (isAuthor) return false;
+            
+            return (isAdmin && isSameCompany) || isSuperAdmin;
         }
 
         public IActionResult OnGet(Guid? id)
@@ -53,6 +75,7 @@ namespace QualityDoc.Pages.Documents
                     .Include(d => d.Author)
                     .Include(d => d.Company)
                     .Include(d => d.Status)
+                    .Include(d => d.Department)
                     .FirstOrDefault(d => d.Id == id);
 
                 if (Documento != null)
@@ -68,6 +91,17 @@ namespace QualityDoc.Pages.Documents
                     }
 
                     CanApprove = CheckApprovalPermissions(Documento, CurrentUserId);
+
+                    bool isAuthor = Documento.AuthorId == CurrentUserId;
+
+                    // SuperAdmin edita todo. Autor edita lo suyo (según instrucción "y si no esta también hazlo").
+                    CanEdit = isSuperAdmin || isAuthor;
+
+                    EditTitle = Documento.Title;
+                    EditDescription = Documento.Description ?? "";
+                    EditDepartmentId = Documento.DepartmentId ?? 0;
+
+                    DepartmentsList = _context.Departments.OrderBy(d => d.Name).ToList();
 
                     Historial = _context.ApprovalHistory
                         .Include(h => h.User)
@@ -217,6 +251,63 @@ namespace QualityDoc.Pages.Documents
             await _context.SaveChangesAsync();
 
             return RedirectToPage(new { id = id }); 
+        }
+
+        public async Task<IActionResult> OnPostEditAsync(Guid id)
+        {
+            var userId = HttpContext.Session.GetInt32("UserId");
+            if (userId == null) return RedirectToPage("/Login");
+
+            var documento = await _context.Documents.FirstOrDefaultAsync(d => d.Id == id);
+            if (documento == null) return RedirectToPage();
+
+            var currentUser = await _context.Users.Include(u => u.Rol).FirstOrDefaultAsync(u => u.Id == userId);
+            bool isSuperAdmin = currentUser?.Rol?.Name?.Trim().Equals("SuperAdmin", StringComparison.OrdinalIgnoreCase) == true 
+                             || currentUser?.Rol?.Name?.Trim().Equals("Super Admin", StringComparison.OrdinalIgnoreCase) == true
+                             || currentUser?.Rol?.Name?.Trim().Equals("Súperadmin", StringComparison.OrdinalIgnoreCase) == true;
+            bool isAuthor = documento.AuthorId == userId;
+
+            if (!isSuperAdmin && !isAuthor)
+            {
+                TempData["ErrorMessage"] = "No tienes permiso para editar este documento.";
+                return RedirectToPage(new { id });
+            }
+
+            documento.Title = EditTitle;
+            documento.Description = EditDescription;
+            documento.DepartmentId = EditDepartmentId > 0 ? EditDepartmentId : (int?)null;
+
+            string editComment = "Metadatos del documento actualizados.";
+
+            if (NewFile != null)
+            {
+                var fileName = $"{Guid.NewGuid()}_{NewFile.FileName}";
+                var uploadsFolder = Path.Combine(_env.WebRootPath, "uploads");
+                if (!Directory.Exists(uploadsFolder)) Directory.CreateDirectory(uploadsFolder);
+                
+                var filePath = Path.Combine(uploadsFolder, fileName);
+                using (var fileStream = new FileStream(filePath, FileMode.Create))
+                {
+                    await NewFile.CopyToAsync(fileStream);
+                }
+
+                documento.FilePath = "/uploads/" + fileName;
+                editComment = "Documento y metadatos actualizados.";
+            }
+
+            _context.ApprovalHistory.Add(new ApprovalHistory
+            {
+                DocumentId = documento.Id,
+                UserId = userId.Value,
+                Action = "Editado",
+                Comment = editComment,
+                ActionDate = DateTime.Now
+            });
+
+            await _context.SaveChangesAsync();
+            TempData["SuccessMessage"] = "Documento actualizado correctamente.";
+
+            return RedirectToPage(new { id });
         }
     }
 }

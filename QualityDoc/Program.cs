@@ -1,9 +1,11 @@
-using Microsoft.EntityFrameworkCore;
-using QualityDoc.Data; 
+﻿using Microsoft.EntityFrameworkCore;
+using QualityDoc.Data;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.Google;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Conexi�n a SQL Server
+// Conexión a SQL Server
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"))
 );
@@ -13,6 +15,19 @@ builder.Services.AddRazorPages();
 builder.Services.AddControllers();
 builder.Services.AddSession();
 builder.Services.AddHttpClient();
+
+// Configuración de Autenticación para Google SSO
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = GoogleDefaults.AuthenticationScheme;
+})
+.AddCookie()
+.AddGoogle(options =>
+{
+    options.ClientId = builder.Configuration["Google:ClientId"] ?? "";
+    options.ClientSecret = builder.Configuration["Google:ClientSecret"] ?? "";
+});
 
 var app = builder.Build();
 
@@ -28,6 +43,7 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.UseSession();

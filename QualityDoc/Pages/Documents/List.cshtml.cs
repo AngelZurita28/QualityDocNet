@@ -5,6 +5,7 @@ using QualityDoc.Data;
 using QualityDoc.Pages.Models;
 using System.Net.Http;
 using System.Net.Http.Json;
+using QualityDoc.Helpers;
 
 namespace QualityDoc.Pages.Documents
 {
@@ -12,6 +13,7 @@ namespace QualityDoc.Pages.Documents
     {
         private readonly AppDbContext _context;
         private readonly IHttpClientFactory _httpClientFactory;
+        private readonly IWebHostEnvironment _env;
 
         public List<Documento> Documentos { get; set; } = new();
 
@@ -25,10 +27,11 @@ namespace QualityDoc.Pages.Documents
         [BindProperty(SupportsGet = true)]
         public int? StatusFilter { get; set; } 
 
-        public ListModel(AppDbContext context, IHttpClientFactory httpClientFactory)
+        public ListModel(AppDbContext context, IHttpClientFactory httpClientFactory, IWebHostEnvironment env)
         {
             _context = context;
             _httpClientFactory = httpClientFactory;
+            _env = env;
         }
 
         public IActionResult OnGet(int pageNumber = 1)
@@ -38,9 +41,33 @@ namespace QualityDoc.Pages.Documents
             if (userId == null)
                 return RedirectToPage("/Login");
 
+            var usuario = _context.Users.FirstOrDefault(u => u.Id == userId);
+            if (usuario == null) return RedirectToPage("/Login");
+
+            var rolName = HttpContext.Session.GetString("Rol") ?? "";
+            bool isSuperAdmin = rolName.Trim().Equals("SuperAdmin", StringComparison.OrdinalIgnoreCase) || 
+                                rolName.Trim().Equals("Super Admin", StringComparison.OrdinalIgnoreCase) ||
+                                rolName.Trim().Equals("Súperadmin", StringComparison.OrdinalIgnoreCase);
+            bool isOperador = rolName.Trim().Equals("Operador", StringComparison.OrdinalIgnoreCase);
+
             PageNumber = pageNumber;
 
-            var query = _context.Documents.Where(d => d.AuthorId == userId.Value);
+            var query = _context.Documents.AsQueryable();
+
+            if (isSuperAdmin)
+            {
+                // Súperadmin ve los de cualquier empresa
+            }
+            else if (isOperador)
+            {
+                // Operador solo ve sus propios documentos en el Dashboard
+                query = query.Where(d => d.AuthorId == userId.Value);
+            }
+            else
+            {
+                // Aprobadores y Admins ven los de su empresa
+                query = query.Where(d => d.CompanyId == usuario.CompanyId);
+            }
 
             if (!string.IsNullOrWhiteSpace(SearchTerm))
             {
@@ -82,26 +109,7 @@ namespace QualityDoc.Pages.Documents
             if (documento == null)
                 return RedirectToPage();
 
-            var payload = new
-            {
-                Id = documento.Id.ToString().ToUpper(),
-                ParentId = documento.ParentId,
-                VersionNumber = documento.VersionNumber,
-                IsLatest = documento.IsLatest,
-                Title = documento.Title,
-                Description = documento.Description,
-                FilePath = documento.FilePath,
-                AuthorId = documento.AuthorId,
-                StatusId = documento.StatusId,
-                CompanyId = documento.CompanyId,
-                CreatedAt = documento.CreatedAt,
-                metadata = new
-                {
-                    fileSize = "N/A",
-                    pages = 0,
-                    checksum = "N/A"
-                }
-            };
+            var payload = DocumentSyncHelper.GenerateSyncPayload(documento, _env.WebRootPath);
 
             try
             {
@@ -116,15 +124,18 @@ namespace QualityDoc.Pages.Documents
                 {
                     documento.SyncFirebase = true;
                     documento.LastErrorLog = null;
+                    TempData["SuccessMessage"] = "Sincronizado con Firebase exitosamente.";
                 }
                 else
                 {
                     documento.LastErrorLog = await response.Content.ReadAsStringAsync();
+                    TempData["ErrorMessage"] = "Error al sincronizar: " + response.StatusCode;
                 }
             }
             catch (Exception ex)
             {
                 documento.LastErrorLog = ex.Message;
+                TempData["ErrorMessage"] = "Fallo de conexión al sincronizar.";
             }
 
             await _context.SaveChangesAsync();

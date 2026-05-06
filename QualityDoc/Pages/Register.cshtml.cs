@@ -32,8 +32,12 @@ namespace QualityDoc.Pages
         [BindProperty]
         public int CompanyId { get; set; }
 
+        [BindProperty]
+        public int DepartmentId { get; set; }
+
         public SelectList Empresas { get; set; }
         public SelectList Roles { get; set; }
+        public SelectList Departamentos { get; set; }
 
         public string Error { get; set; } = string.Empty;
         public string SuccessMessage { get; set; } = string.Empty;
@@ -59,6 +63,13 @@ namespace QualityDoc.Pages
                 return Page();
             }
 
+            if (DepartmentId == 0)
+            {
+                ModelState.AddModelError("DepartmentId", "Debe seleccionar un departamento válido.");
+                await LoadData();
+                return Page();
+            }
+
             Email = Email?.Trim().ToLower() ?? string.Empty;
             FullName = FullName?.Trim() ?? string.Empty;
 
@@ -79,6 +90,7 @@ namespace QualityDoc.Pages
                 PasswordHash = hash,
                 RoleId = RoleId,
                 CompanyId = CompanyId,
+                DepartmentId = DepartmentId,
                 IsActive = true,
                 CreatedAt = DateTime.Now
             };
@@ -92,10 +104,14 @@ namespace QualityDoc.Pages
             var company = await _context.Companies.FindAsync(CompanyId);
             var companyName = company?.Name ?? "Sin Empresa";
 
+            var dept = await _context.Departments.FindAsync(DepartmentId);
+            var deptName = dept?.Name ?? "Sin Área";
+
             HttpContext.Session.SetInt32("UserId", usuario.Id);
             HttpContext.Session.SetString("Usuario", usuario.FullName);
             HttpContext.Session.SetString("Rol", roleName);
             HttpContext.Session.SetString("Empresa", companyName);
+            HttpContext.Session.SetString("Departamento", deptName);
 
             return RedirectToPage("/Index");
         }
@@ -107,6 +123,9 @@ namespace QualityDoc.Pages
 
             var roles = await _context.Roles.ToListAsync();
             Roles = new SelectList(roles, "Id", "Name");
+
+            var depts = await _context.Departments.ToListAsync();
+            Departamentos = new SelectList(depts, "Id", "Name");
         }
     }
 }

@@ -27,148 +27,130 @@
         </div>
 
         <button onclick="openModal()"
-                class="bg-blue-600 text-white px-4 py-2 rounded-lg text-xs flex items-center gap-2 hover:bg-blue-700">
+                class="bg-blue-600 text-white px-4 py-2 rounded-lg text-xs flex items-center gap-2 hover:bg-blue-700 transition shadow-lg shadow-blue-100">
             <span class="material-symbols-outlined text-[16px]">add</span>
             Nuevo Documento
         </button>
     </div>
 
-    <form method="get" class="bg-white p-3 rounded-lg border flex items-center gap-3 w-full max-w-lg">
-        <span class="material-symbols-outlined text-gray-400 text-[18px]">search</span>
-        <input type="text"
-               asp-for="SearchTerm"
-               placeholder="Buscar por código, título o descripción..."
-               class="w-full text-sm outline-none" />
-        @if (!string.IsNullOrEmpty(Model.SearchTerm))
-        {
-            <a asp-page="./Index" class="text-gray-400 hover:text-red-500 transition">
-                <span class="material-symbols-outlined text-[16px]">close</span>
-            </a>
-        }
-        <button type="submit" class="hidden">Buscar</button>
-    </form>
-
-    <div class="bg-white rounded-lg border overflow-hidden">
-
-        <table class="w-full text-sm">
-
-            <thead class="bg-gray-50 text-xs text-gray-500">
-                <tr>
-                    <th class="p-3 text-left">Código</th>
-                    <th class="p-3 text-left">Versión</th>
-                    <th class="p-3 text-left">Estado</th>
-                    <th class="p-3 text-left">Sync</th>
-                    <th class="p-3 text-left">Autor</th>
-                    <th class="p-3 text-left">Descripción</th>
-                    <th class="p-3 text-right">Acción</th>
-                </tr>
-            </thead>
-
-            <tbody>
-
-                @foreach (var doc in Model.Documentos)
-                {
-                    <tr class="border-t hover:bg-gray-50">
-
-                        <td class="p-3 font-medium">@doc.DocumentCode</td>
-                        <td class="p-3">v@(doc.VersionNumber)</td>
-
-                        <td class="p-3">
-                            @{
-                                string badgeClass = doc.StatusId switch {
-                                    1 => "bg-gray-100 text-gray-800",
-                                    2 => "bg-yellow-100 text-yellow-800",
-                                    3 => "bg-green-100 text-green-800",
-                                    4 => "bg-red-100 text-red-800",
-                                    _ => "bg-gray-100 text-gray-800"
-                                };
-                                string statusName = doc.Status?.Name ?? doc.StatusId switch {
-                                    1 => "Borrador",
-                                    2 => "En Revisión",
-                                    3 => "Aprobado",
-                                    4 => "Rechazado",
-                                    _ => "Desconocido"
-                                };
-                            }
-                            <span class="px-2 py-1 rounded text-[10px] uppercase tracking-wider font-bold @badgeClass">
-                                @statusName
-                            </span>
-                        </td>
-
-                        <td class="p-3">
-                            @if (doc.SyncFirebase)
-                            {
-                                <span class="text-green-600 text-xs">✔ Firebase</span>
-                            }
-                            else
-                            {
-                                <span class="text-red-600 text-xs">❌ Firebase</span>
-                            }
-                        </td>
-
-                        <td class="p-3 text-gray-500">@(doc.Author?.FullName ?? "Desconocido")</td>
-
-                        <td class="p-3 text-gray-500 max-w-[250px] truncate">@doc.Description</td>
-
-                        <td class="p-3 text-right space-x-2">
-
-                            @if (doc.StatusId == 3)
-                            {
-                                @if (!doc.SyncFirebase)
-                                {
-                                    <form method="post" asp-page-handler="Sync" class="inline">
-                                        <input type="hidden" name="id" value="@doc.Id" />
-                                        <button class="bg-blue-600 text-white px-3 py-1 rounded text-xs hover:bg-blue-700">
-                                            Firebase
-                                        </button>
-                                    </form>
-                                }
-
-                                @if (!doc.SyncPostgre)
-                                {
-                                    <button class="bg-purple-600 text-white px-3 py-1 rounded text-xs hover:bg-purple-700">
-                                        Postgre
-                                    </button>
-                                }
-                            }
-                            else
-                            {
-                                <span class="text-xs text-gray-400 italic">No sincronizable</span>
-                            }
-                        </td>
-                    </tr>
-                }
-
-            </tbody>
-
-        </table>
-
-        <!-- Paginación -->
-        <div class="p-3 flex justify-between items-center text-xs border-t bg-gray-50">
-            <span class="text-gray-500">Mostrando página @Model.PageNumber de @(Model.TotalPages == 0 ? 1 : Model.TotalPages)</span>
-            
-            <div class="flex gap-1">
-                <a asp-page="./Index" asp-route-pageNumber="@(Model.PageNumber - 1)" asp-route-SearchTerm="@Model.SearchTerm"
-                   class="px-2 py-1 border rounded bg-white @(Model.PageNumber <= 1 ? "opacity-50 pointer-events-none" : "hover:bg-gray-100")">
-                    ◀
-                </a>
-
-                @for (int i = 1; i <= (Model.TotalPages == 0 ? 1 : Model.TotalPages); i++)
-                {
-                    <a asp-page="./Index" asp-route-pageNumber="@i" asp-route-SearchTerm="@Model.SearchTerm"
-                       class="px-2 py-1 border rounded @(i == Model.PageNumber ? "bg-blue-600 text-white" : "bg-white hover:bg-gray-100")">
-                        @i
-                    </a>
-                }
-
-                <a asp-page="./Index" asp-route-pageNumber="@(Model.PageNumber + 1)" asp-route-SearchTerm="@Model.SearchTerm"
-                   class="px-2 py-1 border rounded bg-white @(Model.PageNumber >= Model.TotalPages ? "opacity-50 pointer-events-none" : "hover:bg-gray-100")">
-                    ▶
-                </a>
+    <!-- Tarjetas Resumen -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+        <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4 hover:shadow-md transition">
+            <div class="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center">
+                <span class="material-symbols-outlined text-2xl">description</span>
+            </div>
+            <div>
+                <p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Total Documentos</p>
+                <p class="text-2xl font-black text-gray-800">@Model.CountTotal</p>
             </div>
         </div>
 
+        <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4 hover:shadow-md transition">
+            <div class="w-12 h-12 bg-yellow-50 text-yellow-600 rounded-xl flex items-center justify-center">
+                <span class="material-symbols-outlined text-2xl">pending_actions</span>
+            </div>
+            <div>
+                <p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">En Revisión</p>
+                <p class="text-2xl font-black text-gray-800">@Model.CountRevision</p>
+            </div>
+        </div>
+
+        <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4 hover:shadow-md transition">
+            <div class="w-12 h-12 bg-green-50 text-green-600 rounded-xl flex items-center justify-center">
+                <span class="material-symbols-outlined text-2xl">check_circle</span>
+            </div>
+            <div>
+                <p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Aprobados</p>
+                <p class="text-2xl font-black text-gray-800">@Model.CountAprobado</p>
+            </div>
+        </div>
+
+        <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4 hover:shadow-md transition">
+            <div class="w-12 h-12 bg-red-50 text-red-600 rounded-xl flex items-center justify-center">
+                <span class="material-symbols-outlined text-2xl">error</span>
+            </div>
+            <div>
+                <p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Rechazados</p>
+                <p class="text-2xl font-black text-gray-800">@Model.CountRechazado</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+        <!-- Gráfica de Pastel (Estados) -->
+        <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col items-center">
+            <h3 class="font-bold text-gray-700 mb-6 uppercase tracking-widest text-[10px]">Distribución por Estado</h3>
+            <div class="w-full max-w-[280px]">
+                <canvas id="statusChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Gráfica de Barras (Departamentos) -->
+        <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col">
+            <h3 class="font-bold text-gray-700 mb-6 uppercase tracking-widest text-[10px]">Carga por Departamento</h3>
+            <div class="flex-1 min-h-[300px]">
+                <canvas id="deptChart"></canvas>
+            </div>
+        </div>
     </div>
 
 </div>
-
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // Data from C# Model
+        const deptLabels = @Html.Raw(Json.Serialize(Model.DeptStats.Select(s => s.Name)));
+        const borradorData = @Html.Raw(Json.Serialize(Model.DeptStats.Select(s => s.Borrador)));
+        const revisionData = @Html.Raw(Json.Serialize(Model.DeptStats.Select(s => s.Revision)));
+        const aprobadoData = @Html.Raw(Json.Serialize(Model.DeptStats.Select(s => s.Aprobado)));
+        const rechazadoData = @Html.Raw(Json.Serialize(Model.DeptStats.Select(s => s.Rechazado)));
+
+        // Status Chart (Pie)
+        const ctxStatus = document.getElementById('statusChart').getContext('2d');
+        new Chart(ctxStatus, {
+            type: 'pie',
+            data: {
+                labels: ['Borrador', 'En Revisión', 'Aprobado', 'Rechazado'],
+                datasets: [{
+                    data: [@Model.CountBorrador, @Model.CountRevision, @Model.CountAprobado, @Model.CountRechazado],
+                    backgroundColor: ['#e2e8f0', '#fef08a', '#bbf7d0', '#fecaca'],
+                    borderColor: ['#94a3b8', '#facc15', '#4ade80', '#f87171'],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { position: 'bottom', labels: { font: { size: 10 } } }
+                }
+            }
+        });
+
+        // Dept Chart (Stacked Bar)
+        const ctxDept = document.getElementById('deptChart').getContext('2d');
+        new Chart(ctxDept, {
+            type: 'bar',
+            data: {
+                labels: deptLabels,
+                datasets: [
+                    { label: 'Borrador', data: borradorData, backgroundColor: '#e2e8f0' },
+                    { label: 'Revisión', data: revisionData, backgroundColor: '#fef08a' },
+                    { label: 'Aprobado', data: aprobadoData, backgroundColor: '#bbf7d0' },
+                    { label: 'Rechazado', data: rechazadoData, backgroundColor: '#fecaca' }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { stacked: true, grid: { display: false }, ticks: { font: { size: 10 } } },
+                    y: { stacked: true, beginAtZero: true, ticks: { font: { size: 10 } } }
+                },
+                plugins: {
+                    legend: { position: 'top', labels: { boxWidth: 12, font: { size: 10 } } }
+                }
+            }
+        });
+    </script>
+}

@@ -13,11 +13,24 @@ namespace QualityDoc.Pages
         private readonly IWebHostEnvironment _env;
         private readonly IHttpClientFactory _httpClientFactory;
 
-        public List<Documento> Documentos { get; set; } = new();
-        
-        public int PageNumber { get; set; } = 1;
-        public int TotalPages { get; set; }
-        public int PageSize { get; set; } = 15;
+        public int CountTotal { get; set; }
+        public int CountBorrador { get; set; }
+        public int CountRevision { get; set; }
+        public int CountAprobado { get; set; }
+        public int CountRechazado { get; set; }
+
+        public List<DepartmentStat> DeptStats { get; set; } = new();
+        public List<Department> DepartmentsList { get; set; } = new();
+
+        public class DepartmentStat
+        {
+            public string Name { get; set; } = "";
+            public int Count { get; set; }
+            public int Borrador { get; set; }
+            public int Revision { get; set; }
+            public int Aprobado { get; set; }
+            public int Rechazado { get; set; }
+        }
 
         public IndexModel(AppDbContext context, IWebHostEnvironment env, IHttpClientFactory httpClientFactory)
         {
@@ -29,8 +42,7 @@ namespace QualityDoc.Pages
         [BindProperty]
         public string Title { get; set; } = string.Empty;
 
-        [BindProperty(SupportsGet = true)]
-        public string? SearchTerm { get; set; }
+
 
         [BindProperty]
         public string Description { get; set; } = string.Empty;
@@ -44,7 +56,10 @@ namespace QualityDoc.Pages
         [BindProperty]
         public string? CodigoExistente { get; set; }
 
-        public async Task<IActionResult> OnGetAsync(int pageNumber = 1)
+        [BindProperty]
+        public int SelectedDepartmentId { get; set; }
+
+        public async Task<IActionResult> OnGetAsync()
         {
             var userId = HttpContext.Session.GetInt32("UserId");
             if (userId == null) return RedirectToPage("/Login");
@@ -58,7 +73,6 @@ namespace QualityDoc.Pages
                                 rolName.Trim().Equals("Súperadmin", StringComparison.OrdinalIgnoreCase);
             bool isOperador = rolName.Trim().Equals("Operador", StringComparison.OrdinalIgnoreCase);
 
-            PageNumber = pageNumber;
 
             IQueryable<Documento> query = _context.Documents.Where(d => d.IsLatest);
 
@@ -77,24 +91,24 @@ namespace QualityDoc.Pages
                 query = query.Where(d => d.CompanyId == usuario.CompanyId);
             }
 
-            if (!string.IsNullOrWhiteSpace(SearchTerm))
+            CountTotal = await query.CountAsync();
+            CountBorrador = await query.CountAsync(d => d.StatusId == 1);
+            CountRevision = await query.CountAsync(d => d.StatusId == 2);
+            CountAprobado = await query.CountAsync(d => d.StatusId == 3);
+            CountRechazado = await query.CountAsync(d => d.StatusId == 4);
+
+            DepartmentsList = await _context.Departments.ToListAsync();
+
+            var docs = await query.Include(d => d.Department).ToListAsync();
+            DeptStats = DepartmentsList.Select(dept => new DepartmentStat
             {
-                var term = SearchTerm.Trim();
-                query = query.Where(d => d.Title.Contains(term) || 
-                                         d.DocumentCode.Contains(term) ||
-                                         (d.Description != null && d.Description.Contains(term)));
-            }
-
-            int totalRecords = await query.CountAsync();
-            TotalPages = (int)Math.Ceiling(totalRecords / (double)PageSize);
-
-            Documentos = await query
-                .Include(d => d.Author)
-                .Include(d => d.Company)
-                .OrderByDescending(d => d.CreatedAt)
-                .Skip((PageNumber - 1) * PageSize)
-                .Take(PageSize)
-                .ToListAsync();
+                Name = dept.Name,
+                Count = docs.Count(d => d.DepartmentId == dept.Id),
+                Borrador = docs.Count(d => d.DepartmentId == dept.Id && d.StatusId == 1),
+                Revision = docs.Count(d => d.DepartmentId == dept.Id && d.StatusId == 2),
+                Aprobado = docs.Count(d => d.DepartmentId == dept.Id && d.StatusId == 3),
+                Rechazado = docs.Count(d => d.DepartmentId == dept.Id && d.StatusId == 4)
+            }).ToList();
 
             return Page();
         }
@@ -168,6 +182,7 @@ namespace QualityDoc.Pages
                 ParentId = parentId,
                 AuthorId = usuario.Id,
                 CompanyId = (int)usuario.CompanyId,
+                DepartmentId = SelectedDepartmentId,
                 StatusId = 1,
                 CreatedAt = DateTime.Now
             };
@@ -189,40 +204,6 @@ namespace QualityDoc.Pages
             return new JsonResult(new { success = true });
         }
 
-        public async Task<IActionResult> OnPostSyncAsync(Guid id)
-        {
-            var userId = HttpContext.Session.GetInt32("UserId");
-            if (userId == null) return RedirectToPage("/Login");
 
-            var documento = await _context.Documents.FirstOrDefaultAsync(d => d.Id == id);
-            if (documento == null) return RedirectToPage();
-
-            var payload = DocumentSyncHelper.GenerateSyncPayload(documento, _env.WebRootPath);
-
-            try
-            {
-                var client = _httpClientFactory.CreateClient();
-                var response = await client.PostAsJsonAsync("http://localhost:3000/api/documents", payload);
-                if (response.IsSuccessStatusCode)
-                {
-                    documento.SyncFirebase = true;
-                    documento.LastErrorLog = null;
-                    TempData["SuccessMessage"] = "Sincronizado con Firebase exitosamente.";
-                }
-                else
-                {
-                    documento.LastErrorLog = await response.Content.ReadAsStringAsync();
-                    TempData["ErrorMessage"] = "Error al sincronizar: " + response.StatusCode;
-                }
-            }
-            catch (Exception ex)
-            {
-                documento.LastErrorLog = ex.Message;
-                TempData["ErrorMessage"] = "Fallo de conexión al sincronizar.";
-            }
-
-            await _context.SaveChangesAsync();
-            return RedirectToPage();
-        }
     }
 }

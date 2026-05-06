@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using QualityDoc.Pages.Models;
 
 namespace QualityDoc.Data
@@ -13,6 +13,7 @@ namespace QualityDoc.Data
         public DbSet<DocumentStatus> DocumentStatus { get; set; }
         public DbSet<Documento> Documents { get; set; }
         public DbSet<ApprovalHistory> ApprovalHistory { get; set; }
+        public DbSet<Department> Departments { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -43,6 +44,21 @@ namespace QualityDoc.Data
                 .HasForeignKey(d => d.ParentId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            modelBuilder.Entity<Documento>()
+                .HasOne(d => d.Department)
+                .WithMany(dp => dp.Documents)
+                .HasForeignKey(d => d.DepartmentId);
+
+            // Seed Departments
+            modelBuilder.Entity<Department>().HasData(
+                new Department { Id = 1, Name = "Calidad" },
+                new Department { Id = 2, Name = "Producción" },
+                new Department { Id = 3, Name = "Recursos Humanos" },
+                new Department { Id = 4, Name = "Contabilidad" },
+                new Department { Id = 5, Name = "Compras" },
+                new Department { Id = 6, Name = "Sistemas" }
+            );
+
             modelBuilder.Entity<Usuario>()
                 .HasOne(u => u.Rol)
                 .WithMany(r => r.Users)
@@ -52,6 +68,11 @@ namespace QualityDoc.Data
                 .HasOne(u => u.Company)
                 .WithMany(c => c.Users)
                 .HasForeignKey(u => u.CompanyId);
+
+            modelBuilder.Entity<Usuario>()
+                .HasOne(u => u.Department)
+                .WithMany()
+                .HasForeignKey(u => u.DepartmentId);
 
             
             modelBuilder.Entity<ApprovalHistory>()

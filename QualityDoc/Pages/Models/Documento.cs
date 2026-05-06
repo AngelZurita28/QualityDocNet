@@ -1,4 +1,4 @@
-﻿namespace QualityDoc.Pages.Models
+namespace QualityDoc.Pages.Models
 {
     public class Documento
     {
@@ -15,6 +15,7 @@
         public int AuthorId { get; set; }
         public int StatusId { get; set; }
         public int? CompanyId { get; set; }
+        public int? DepartmentId { get; set; }
         public string? DocumentCode { get; set; }
 
         public DateTime CreatedAt { get; set; }
@@ -27,5 +28,6 @@
         public Usuario Author { get; set; }
         public DocumentStatus Status { get; set; }
         public Company Company { get; set; }
+        public Department? Department { get; set; }
     }
 }

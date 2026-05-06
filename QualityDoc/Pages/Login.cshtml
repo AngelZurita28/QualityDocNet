@@ -70,6 +70,17 @@
 
                 </form>
 
+                <div class="relative my-6">
+                    <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-gray-200"></div></div>
+                    <div class="relative flex justify-center text-xs uppercase"><span class="bg-white px-2 text-gray-400">O ingresa con</span></div>
+                </div>
+
+                <a asp-page-handler="GoogleLogin"
+                   class="w-full h-9 border border-gray-300 rounded flex items-center justify-center gap-3 text-sm font-medium hover:bg-gray-50 transition cursor-pointer">
+                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="w-5 h-5" alt="Google Logo" />
+                    Iniciar sesión con Google
+                </a>
+
                 @if (!string.IsNullOrEmpty(Model.Error))
                 {
                     <p class="text-red-500 text-sm mt-3">@Model.Error</p>

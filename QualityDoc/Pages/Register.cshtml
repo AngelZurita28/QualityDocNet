@@ -86,6 +86,13 @@
                         </div>
 
                         <div>
+                            <label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Departamento</label>
+                            <select asp-for="DepartmentId" asp-items="Model.Departamentos" class="w-full border-gray-200 rounded-xl focus:border-blue-500 focus:ring-0 text-sm py-2 bg-white" required>
+                                <option value="">Seleccionar Departamento...</option>
+                            </select>
+                        </div>
+
+                        <div>
                             <label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Contraseña</label>
                             <div class="relative">
                                 <span class="material-symbols-outlined absolute left-3 top-2.5 text-gray-400 text-sm">lock</span>
