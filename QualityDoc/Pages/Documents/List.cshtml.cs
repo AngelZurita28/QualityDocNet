@@ -5,6 +5,7 @@ using QualityDoc.Data;
 using QualityDoc.Pages.Models;
 using System.Net.Http;
 using System.Net.Http.Json;
+using System.Text.Json;
 using QualityDoc.Helpers;
 
 namespace QualityDoc.Pages.Documents
@@ -14,6 +15,7 @@ namespace QualityDoc.Pages.Documents
         private readonly AppDbContext _context;
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IWebHostEnvironment _env;
+        private readonly IConfiguration _configuration;
 
         public List<Documento> Documentos { get; set; } = new();
 
@@ -27,11 +29,12 @@ namespace QualityDoc.Pages.Documents
         [BindProperty(SupportsGet = true)]
         public int? StatusFilter { get; set; } 
 
-        public ListModel(AppDbContext context, IHttpClientFactory httpClientFactory, IWebHostEnvironment env)
+        public ListModel(AppDbContext context, IHttpClientFactory httpClientFactory, IWebHostEnvironment env, IConfiguration configuration)
         {
             _context = context;
             _httpClientFactory = httpClientFactory;
             _env = env;
+            _configuration = configuration;
         }
 
         public IActionResult OnGet(int pageNumber = 1)
@@ -72,7 +75,7 @@ namespace QualityDoc.Pages.Documents
             if (!string.IsNullOrWhiteSpace(SearchTerm))
             {
                 var term = SearchTerm.Trim();
-                query = query.Where(d => d.Title.Contains(term) || d.DocumentCode.Contains(term));
+                query = query.Where(d => d.Title.Contains(term) || (d.DocumentCode != null && d.DocumentCode.Contains(term)));
             }
 
             if (StatusFilter.HasValue && StatusFilter.Value > 0)
@@ -109,6 +112,13 @@ namespace QualityDoc.Pages.Documents
             if (documento == null)
                 return RedirectToPage();
 
+            // Si ya está sincronizado, no hacer nada (por si el botón se pica dos veces)
+            if (documento.SyncFirebase)
+            {
+                TempData["SuccessMessage"] = "Este documento ya estaba sincronizado con Firebase.";
+                return RedirectToPage(new { pageNumber = PageNumber });
+            }
+
             var payload = DocumentSyncHelper.GenerateSyncPayload(documento, _env.WebRootPath);
 
             try
@@ -120,6 +130,8 @@ namespace QualityDoc.Pages.Documents
                     payload
                 );
 
+                var responseBody = await response.Content.ReadAsStringAsync();
+
                 if (response.IsSuccessStatusCode)
                 {
                     documento.SyncFirebase = true;
@@ -128,8 +140,23 @@ namespace QualityDoc.Pages.Documents
                 }
                 else
                 {
-                    documento.LastErrorLog = await response.Content.ReadAsStringAsync();
-                    TempData["ErrorMessage"] = "Error al sincronizar: " + response.StatusCode;
+                    // Chequeo directo en el texto: si dice "ya existe", lo tratamos como éxito
+                    // porque el documento ya está en Firestore (posiblemente sincronizado antes)
+                    bool yaExiste = responseBody.Contains("ya existe", StringComparison.OrdinalIgnoreCase)
+                                 || responseBody.Contains("already exists", StringComparison.OrdinalIgnoreCase)
+                                 || responseBody.Contains("duplicate", StringComparison.OrdinalIgnoreCase);
+
+                    if (yaExiste)
+                    {
+                        documento.SyncFirebase = true;
+                        documento.LastErrorLog = null;
+                        TempData["SuccessMessage"] = "El documento ya estaba sincronizado con Firebase.";
+                    }
+                    else
+                    {
+                        documento.LastErrorLog = responseBody;
+                        TempData["ErrorMessage"] = "Error al sincronizar: " + response.StatusCode;
+                    }
                 }
             }
             catch (Exception ex)
@@ -141,6 +168,52 @@ namespace QualityDoc.Pages.Documents
             await _context.SaveChangesAsync();
 
             return RedirectToPage(new { pageNumber = PageNumber }); 
+
+        }
+
+        public async Task<IActionResult> OnPostSyncPostgreAsync(Guid id)
+        {
+            var userId = HttpContext.Session.GetInt32("UserId");
+            if (userId == null)
+                return RedirectToPage("/Login");
+
+            var documento = _context.Documents
+                .Include(d => d.Company)
+                .Include(d => d.Status)
+                .FirstOrDefault(d => d.Id == id);
+
+            if (documento == null)
+                return RedirectToPage();
+
+            var connString = _configuration.GetConnectionString("PostgresConnection");
+            if (string.IsNullOrEmpty(connString))
+            {
+                TempData["ErrorMessage"] = "Cadena de conexión a PostgreSQL no configurada.";
+                return RedirectToPage(new { pageNumber = PageNumber });
+            }
+
+            try
+            {
+                bool success = await PostgreSyncHelper.SyncToPostgreAsync(documento, connString);
+                if (success)
+                {
+                    documento.SyncPostgre = true;
+                    documento.LastErrorLog = null;
+                    TempData["SuccessMessage"] = "Sincronizado con PostgreSQL de manera exitosa.";
+                }
+                else
+                {
+                    TempData["ErrorMessage"] = "No se pudieron realizar cambios en PostgreSQL.";
+                }
+            }
+            catch (Exception ex)
+            {
+                documento.LastErrorLog = "Error Postgres: " + ex.Message;
+                TempData["ErrorMessage"] = "Fallo al sincronizar con PostgreSQL: " + ex.Message;
+            }
+
+            await _context.SaveChangesAsync();
+            return RedirectToPage(new { pageNumber = PageNumber });
         }
     }
 }

@@ -17,8 +17,8 @@ namespace QualityDoc.Pages.Admin
         }
 
         public List<Usuario> Usuarios { get; set; } = new();
-        public SelectList RolesList { get; set; }
-        public SelectList CompaniesList { get; set; }
+        public SelectList RolesList { get; set; } = null!;
+        public SelectList CompaniesList { get; set; } = null!;
         public string MensajeExito { get; set; } = string.Empty;
 
         public int PageNumber { get; set; } = 1;

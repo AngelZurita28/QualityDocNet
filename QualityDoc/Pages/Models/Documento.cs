@@ -25,9 +25,9 @@ namespace QualityDoc.Pages.Models
 
         public string? LastErrorLog { get; set; }
 
-        public Usuario Author { get; set; }
-        public DocumentStatus Status { get; set; }
-        public Company Company { get; set; }
+        public Usuario Author { get; set; } = null!;
+        public DocumentStatus Status { get; set; } = null!;
+        public Company Company { get; set; } = null!;
         public Department? Department { get; set; }
     }
 }

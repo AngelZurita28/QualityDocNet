@@ -128,16 +128,18 @@
                             {
                                 @if (!doc.SyncFirebase)
                                 {
-                                    <form method="post" asp-page-handler="SyncAsync" class="inline" onclick="event.stopPropagation()">
+                                    <form method="post" asp-page-handler="SyncAsync" class="inline">
                                         <input type="hidden" name="id" value="@doc.Id" />
-                                        <button type="submit" class="bg-blue-600 text-white px-3 py-1 rounded text-[10px] hover:bg-blue-700 transition">
+                                        <button type="submit"
+                                                onclick="event.stopPropagation()"
+                                                class="relative z-10 bg-blue-600 text-white px-3 py-1 rounded text-[10px] hover:bg-blue-700 transition cursor-pointer">
                                             Firebase
                                         </button>
                                     </form>
                                 }
                                 else
                                 {
-                                    <span class="text-green-600 text-[10px] font-bold">✔ Sync</span>
+                                    <span class="text-green-600 text-[10px] font-bold">✔ Sincronizado</span>
                                 }
                             }
                             else
@@ -150,13 +152,18 @@
                             {
                                 @if (!doc.SyncPostgre)
                                 {
-                                    <button class="bg-purple-600 text-white px-3 py-1 rounded text-[10px] hover:bg-purple-700 transition" onclick="event.stopPropagation()">
-                                        Postgre
-                                    </button>
+                                    <form method="post" asp-page-handler="SyncPostgre" class="inline">
+                                        <input type="hidden" name="id" value="@doc.Id" />
+                                        <button type="submit"
+                                                onclick="event.stopPropagation()"
+                                                class="relative z-10 bg-purple-600 text-white px-3 py-1 rounded text-[10px] hover:bg-purple-700 transition cursor-pointer">
+                                            Postgre
+                                        </button>
+                                    </form>
                                 }
                                 else
                                 {
-                                    <span class="text-green-600 text-[10px] font-bold">✔ Sync</span>
+                                    <span class="text-green-600 text-[10px] font-bold">✔ Sincronizado</span>
                                 }
                             }
                             else

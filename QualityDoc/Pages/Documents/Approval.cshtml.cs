@@ -5,6 +5,7 @@ using QualityDoc.Data;
 using QualityDoc.Pages.Models;
 using System.Net.Http.Json;
 using QualityDoc.Helpers;
+using Microsoft.Extensions.Configuration;
 
 namespace QualityDoc.Pages.Documents
 {
@@ -31,10 +32,13 @@ namespace QualityDoc.Pages.Documents
 
         public List<Department> DepartmentsList { get; set; } = new();
 
-        public ApprovalModel(AppDbContext context, IWebHostEnvironment env)
+        private readonly IConfiguration _configuration;
+
+        public ApprovalModel(AppDbContext context, IWebHostEnvironment env, IConfiguration configuration)
         {
             _context = context;
             _env = env;
+            _configuration = configuration;
         }
 
         private bool CheckApprovalPermissions(Documento doc, int userId)
@@ -220,6 +224,18 @@ namespace QualityDoc.Pages.Documents
             var documento = _context.Documents.FirstOrDefault(d => d.Id == id);
             if (documento == null) return RedirectToPage();
 
+            // Si ya está marcado como sincronizado, limpiar cualquier error residual y no repetir
+            if (documento.SyncFirebase)
+            {
+                if (!string.IsNullOrEmpty(documento.LastErrorLog))
+                {
+                    documento.LastErrorLog = null;
+                    await _context.SaveChangesAsync();
+                }
+                TempData["SuccessMessage"] = "Este documento ya estaba sincronizado con Firebase.";
+                return RedirectToPage(new { id = id });
+            }
+
             var payload = DocumentSyncHelper.GenerateSyncPayload(documento, _env.WebRootPath);
 
             try
@@ -230,6 +246,8 @@ namespace QualityDoc.Pages.Documents
                     payload
                 );
 
+                var responseBody = await response.Content.ReadAsStringAsync();
+
                 if (response.IsSuccessStatusCode)
                 {
                     documento.SyncFirebase = true;
@@ -238,8 +256,24 @@ namespace QualityDoc.Pages.Documents
                 }
                 else
                 {
-                    documento.LastErrorLog = await response.Content.ReadAsStringAsync();
-                    TempData["ErrorMessage"] = "Error al sincronizar: " + response.StatusCode;
+                    // Si el documento ya existe en Firestore, se trata como éxito
+                    bool yaExiste = responseBody.Contains("ya existe", StringComparison.OrdinalIgnoreCase)
+                                 || responseBody.Contains("already exists", StringComparison.OrdinalIgnoreCase)
+                                 || responseBody.Contains("duplicate", StringComparison.OrdinalIgnoreCase)
+                                 || responseBody.Contains("duplicar", StringComparison.OrdinalIgnoreCase)
+                                 || responseBody.Contains("No se permite", StringComparison.OrdinalIgnoreCase);
+
+                    if (yaExiste)
+                    {
+                        documento.SyncFirebase = true;
+                        documento.LastErrorLog = null;
+                        TempData["SuccessMessage"] = "El documento ya estaba sincronizado con Firebase.";
+                    }
+                    else
+                    {
+                        documento.LastErrorLog = responseBody;
+                        TempData["ErrorMessage"] = "Error al sincronizar: " + response.StatusCode;
+                    }
                 }
             }
             catch (Exception ex)
@@ -251,6 +285,49 @@ namespace QualityDoc.Pages.Documents
             await _context.SaveChangesAsync();
 
             return RedirectToPage(new { id = id }); 
+        }
+
+        public async Task<IActionResult> OnPostSyncPostgreAsync(Guid id)
+        {
+            var userId = HttpContext.Session.GetInt32("UserId");
+            if (userId == null) return RedirectToPage("/Login");
+
+            var documento = _context.Documents
+                .Include(d => d.Company)
+                .Include(d => d.Status)
+                .FirstOrDefault(d => d.Id == id);
+
+            if (documento == null) return RedirectToPage();
+
+            var connString = _configuration.GetConnectionString("PostgresConnection");
+            if (string.IsNullOrEmpty(connString))
+            {
+                TempData["ErrorMessage"] = "Cadena de conexión a PostgreSQL no configurada.";
+                return RedirectToPage(new { id = id });
+            }
+
+            try
+            {
+                bool success = await PostgreSyncHelper.SyncToPostgreAsync(documento, connString);
+                if (success)
+                {
+                    documento.SyncPostgre = true;
+                    documento.LastErrorLog = null;
+                    TempData["SuccessMessage"] = "Sincronizado con PostgreSQL de manera exitosa.";
+                }
+                else
+                {
+                    TempData["ErrorMessage"] = "No se pudieron realizar cambios en PostgreSQL.";
+                }
+            }
+            catch (Exception ex)
+            {
+                documento.LastErrorLog = "Error Postgres: " + ex.Message;
+                TempData["ErrorMessage"] = "Fallo al sincronizar con PostgreSQL: " + ex.Message;
+            }
+
+            await _context.SaveChangesAsync();
+            return RedirectToPage(new { id = id });
         }
 
         public async Task<IActionResult> OnPostEditAsync(Guid id)

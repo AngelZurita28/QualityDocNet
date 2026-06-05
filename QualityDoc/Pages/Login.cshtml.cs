@@ -32,7 +32,7 @@ public class LoginModel : PageModel
 
     public IActionResult OnPost()
     {
-        Correo = Correo?.Trim().ToLower();
+        Correo = Correo?.Trim().ToLower() ?? string.Empty;
 
         var hash = PasswordHelper.HashPassword(Password);
 

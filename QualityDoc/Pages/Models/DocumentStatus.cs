@@ -1,10 +1,10 @@
-﻿namespace QualityDoc.Pages.Models
+namespace QualityDoc.Pages.Models
 {
     public class DocumentStatus
     {
         public int Id { get; set; }
         public string Name { get; set; } = string.Empty;
 
-        public ICollection<Documento> Documents { get; set; }
+        public ICollection<Documento> Documents { get; set; } = new List<Documento>();
     }
 }

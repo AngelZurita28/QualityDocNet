@@ -35,9 +35,9 @@ namespace QualityDoc.Pages
         [BindProperty]
         public int DepartmentId { get; set; }
 
-        public SelectList Empresas { get; set; }
-        public SelectList Roles { get; set; }
-        public SelectList Departamentos { get; set; }
+        public SelectList Empresas { get; set; } = null!;
+        public SelectList Roles { get; set; } = null!;
+        public SelectList Departamentos { get; set; } = null!;
 
         public string Error { get; set; } = string.Empty;
         public string SuccessMessage { get; set; } = string.Empty;

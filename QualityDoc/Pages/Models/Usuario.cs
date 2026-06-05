@@ -15,7 +15,7 @@ namespace QualityDoc.Pages.Models
         public bool IsActive { get; set; }
         public DateTime CreatedAt { get; set; }
 
-        public Rol Rol { get; set; }
+        public Rol Rol { get; set; } = null!;
         public Company? Company { get; set; } 
         public Department? Department { get; set; }
     }

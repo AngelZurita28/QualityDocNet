@@ -48,7 +48,7 @@ namespace QualityDoc.Pages
         public string Description { get; set; } = string.Empty;
 
         [BindProperty]
-        public IFormFile UploadFile { get; set; }
+        public IFormFile? UploadFile { get; set; }
 
         [BindProperty]
         public bool EsNuevaVersion { get; set; }

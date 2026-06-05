@@ -8,9 +8,9 @@ namespace QualityDoc.Helpers
     {
         public static object GenerateSyncPayload(Documento documento, string webRootPath)
         {
-            var physicalPath = Path.Combine(webRootPath, documento.FilePath.TrimStart('/'));
+            var physicalPath = Path.Combine(webRootPath, (documento.FilePath ?? string.Empty).TrimStart('/'));
             
-            object metadata = null;
+            object? metadata = null;
 
             if (File.Exists(physicalPath))
             {

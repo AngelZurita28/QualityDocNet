@@ -1,4 +1,4 @@
-﻿namespace QualityDoc.Pages.Models
+namespace QualityDoc.Pages.Models
 {
     public class Company
     {
@@ -7,6 +7,6 @@
         public bool IsActive { get; set; }
         public DateTime CreatedAt { get; set; }
 
-        public ICollection<Usuario> Users { get; set; }
+        public ICollection<Usuario> Users { get; set; } = new List<Usuario>();
     }
 }
