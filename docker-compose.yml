@@ -9,6 +9,7 @@ services:
     environment:
       - ASPNETCORE_URLS=http://0.0.0.0:5000
       - ASPNETCORE_ENVIRONMENT=Development
+      - DOTNET_WATCH_SUPPRESS_LAUNCH_BROWSER=1
       # Conexión dinámica. Usa el nombre del contenedor de la DB ("mssql_db")
       - ConnectionStrings__DefaultConnection=Server=mssql_db;Database=QualityDocDB;User Id=${DB_USER};Password=${DB_PASSWORD};TrustServerCertificate=True;
     ports:
@@ -17,7 +18,7 @@ services:
       - ./QualityDoc:/app                      
       - ./uploads_compartidos:/app/wwwroot/uploads 
     working_dir: /app
-    command: bash -c "npm install && dotnet watch run"
+    command: bash -c "npm install && dotnet watch run --no-launch-profile"
     depends_on:
       - mssql_db
 
