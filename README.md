@@ -15,7 +15,7 @@ Antes de comenzar, asegúrate de tener instalados:
 1.  **Clonar el repositorio:**
     Abre una terminal y clona el proyecto en tu máquina:
     ```bash
-    git clone <URL_DEL_REPOSITORIO>
+    git clone https://github.com/AngelZurita28/QualityDocNet.git
     cd QualityDocNet
     ```
 
