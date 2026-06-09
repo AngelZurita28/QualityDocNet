@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  dotnet_backend:
+    build: 
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: dotnet_backend
+    environment:
+      - ASPNETCORE_URLS=http://0.0.0.0:5000
+      - ASPNETCORE_ENVIRONMENT=Development
+      # Conexión dinámica. Usa el nombre del contenedor de la DB ("mssql_db")
+      - ConnectionStrings__DefaultConnection=Server=mssql_db;Database=QualityDocDB;User Id=${DB_USER};Password=${DB_PASSWORD};TrustServerCertificate=True;
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./QualityDoc:/app                      
+      - ./uploads_compartidos:/app/wwwroot/uploads 
+    working_dir: /app
+    command: bash -c "npm install && dotnet watch run"
+    depends_on:
+      - mssql_db
+
+  mssql_db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: mssql_db
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=${SA_PASSWORD}
+    ports:
+      - "1433:1433"
+    volumes:
+      - mssql_data:/var/opt/mssql
+
+volumes:
+  mssql_data:

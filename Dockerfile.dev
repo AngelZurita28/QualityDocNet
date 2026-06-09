@@ -1,0 +1,11 @@
+# Usa la imagen oficial del SDK de .NET 10.0
+FROM mcr.microsoft.com/dotnet/sdk:10.0
+
+# Instala Node.js para que npm y Tailwind funcionen
+RUN apt-get update && \
+    apt-get install -y curl && \
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y nodejs
+
+# Establece la carpeta de trabajo
+WORKDIR /app
