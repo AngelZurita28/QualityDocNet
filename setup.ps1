@@ -46,14 +46,19 @@ Write-Host "`nLevantando contenedores... (Esto puede tomar unos minutos la prime
 docker-compose up -d --build
 
 # 6. Esperar a que el motor de base de datos arranque bien
-Write-Host "`nEsperando 25 segundos a que SQL Server inicie correctamente..."
-Start-Sleep -Seconds 25
+Write-Host "`nEsperando 35 segundos a que SQL Server inicie correctamente..."
+Start-Sleep -Seconds 35
 
 # 7. Crear el usuario personalizado si no eligió 'sa'
 if ($dbUser -ne "sa") {
     Write-Host "Creando usuario '$dbUser' en la base de datos..."
-    $sqlQuery = "CREATE LOGIN [$dbUser] WITH PASSWORD = '$dbPasswordPlain'; ALTER SERVER ROLE sysadmin ADD MEMBER [$dbUser];"
-    docker exec -i mssql_db /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$saPassword" -C -Q $sqlQuery
+    $sqlQuery = "IF NOT EXISTS (SELECT * FROM sys.server_principals WHERE name = N'$dbUser') BEGIN CREATE LOGIN [$dbUser] WITH PASSWORD = '$dbPasswordPlain'; END; ALTER SERVER ROLE sysadmin ADD MEMBER [$dbUser];"
+    $execResult = docker exec -i mssql_db /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$saPassword" -C -Q "$sqlQuery"
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Advertencia: Hubo un problema al crear el usuario. Revisa los logs: $execResult" -ForegroundColor Yellow
+    } else {
+        Write-Host "Usuario '$dbUser' verificado/creado con exito." -ForegroundColor Green
+    }
 }
 
 # 8. Importar el script de base de datos
