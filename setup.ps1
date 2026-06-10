@@ -67,7 +67,7 @@ while ($attempt -le $maxAttempts -and -not $isConnected) {
     # Intentamos una consulta simple. Pasamos las credenciales por variables de entorno de Docker 
     # para evitar que PowerShell rompa los caracteres especiales en la linea de comandos.
     $checkQuery = "SELECT 1;"
-    $checkResult = docker exec -e SQLCMDUSER=sa -e "SQLCMDPASSWORD=$saPassword" -i mssql_db /opt/mssql-tools18/bin/sqlcmd -S localhost -C -Q "$checkQuery" 2>&1
+    $checkResult = docker exec -e SQLCMDUSER=sa -e "SQLCMDPASSWORD=$saPassword" -i mssql_db /opt/mssql-tools18/bin/sqlcmd -S 127.0.0.1 -C -Q "$checkQuery" 2>&1
     
     if ($LASTEXITCODE -eq 0) {
         Write-Host "¡Conexion exitosa a SQL Server!" -ForegroundColor Green
@@ -77,7 +77,7 @@ while ($attempt -le $maxAttempts -and -not $isConnected) {
         if ($dbUser -ne "sa") {
             Write-Host "Creando usuario '$dbUser' en la base de datos..."
             $sqlQuery = "IF NOT EXISTS (SELECT * FROM sys.server_principals WHERE name = N'$dbUser') BEGIN CREATE LOGIN [$dbUser] WITH PASSWORD = '$dbPasswordPlain'; END; ALTER SERVER ROLE sysadmin ADD MEMBER [$dbUser];"
-            $userResult = docker exec -e SQLCMDUSER=sa -e "SQLCMDPASSWORD=$saPassword" -i mssql_db /opt/mssql-tools18/bin/sqlcmd -S localhost -C -Q "$sqlQuery" 2>&1
+            $userResult = docker exec -e SQLCMDUSER=sa -e "SQLCMDPASSWORD=$saPassword" -i mssql_db /opt/mssql-tools18/bin/sqlcmd -S 127.0.0.1 -C -Q "$sqlQuery" 2>&1
             if ($LASTEXITCODE -ne 0) {
                 Write-Host "Advertencia al crear usuario: $userResult" -ForegroundColor Yellow
             } else {
@@ -86,11 +86,11 @@ while ($attempt -le $maxAttempts -and -not $isConnected) {
         }
 
         # Importar el script de base de datos
-        $scriptPath = ".\QualityDoc\Database\script_utf8.sql"
+        $scriptPath = "./QualityDoc/Database/script_utf8.sql"
         if (Test-Path -Path $scriptPath) {
             Write-Host "Importando script inicial de la base de datos..."
             docker cp $scriptPath mssql_db:/tmp/script.sql
-            $importResult = docker exec -e SQLCMDUSER=sa -e "SQLCMDPASSWORD=$saPassword" -i mssql_db /opt/mssql-tools18/bin/sqlcmd -S localhost -C -i /tmp/script.sql 2>&1
+            $importResult = docker exec -e SQLCMDUSER=sa -e "SQLCMDPASSWORD=$saPassword" -i mssql_db /opt/mssql-tools18/bin/sqlcmd -S 127.0.0.1 -C -i /tmp/script.sql 2>&1
             if ($LASTEXITCODE -eq 0) {
                 Write-Host "¡Base de datos importada!" -ForegroundColor Green
             } else {
