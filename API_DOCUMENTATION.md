@@ -11,14 +11,16 @@ El controlador [DocumentController](file:///c:/xampp/htdocs/miseria/qualitydoc/c
 2. Visualizar un documento específico, registrando su acceso en la tabla de auditoría.
 3. Consultar el historial de versiones del documento consultado.
 4. Generar acuses de lectura y comprensión de los documentos por parte de los usuarios.
+5. Servir el archivo físico/digital proxyando la descarga desde el servidor de login remoto.
+6. Sincronizar/subir documentos desde la API de C# externa.
 
 ---
 
 ## 🛠️ Enrutamiento y Entrada Principal
 
-El proyecto utiliza un sistema de enrutamiento básico basado en parámetros de consulta a través del archivo de entrada principal [index.php](file:///c:/xampp/htdocs/miseria/qualitydoc/index.php).
+El proyecto está configurado para ejecutarse en Docker bajo el modo de red de host (`network_mode: host`). Esto significa que los contenedores se enlazan directamente a los puertos de tu máquina local sin necesidad de redirigir puertos a través de la red del puente (bridge).
 
-* **URL Base de la Aplicación:** `http://<domain>/qualitydoc/index.php`
+* **URL Base de la Aplicación (Local):** `http://localhost:8080/index.php` (o bien utilizando la IP de tu máquina `http://<IP_MAQUINA>:8080/index.php`)
 * **Parámetro de Acción (`action`):** Define qué método de [DocumentController](file:///c:/xampp/htdocs/miseria/qualitydoc/controllers/DocumentController.php) se ejecuta.
 
 | Acción (`action`) | Método del Controlador | Descripción |
@@ -26,6 +28,7 @@ El proyecto utiliza un sistema de enrutamiento básico basado en parámetros de 
 | `index` *(por defecto)* | `index()` | Muestra el listado de documentos vigentes. |
 | `view` | `view()` | Muestra la vista detallada de un documento, su historial y audita la acción. |
 | `acknowledge` | `acknowledge()` | Registra la confirmación de lectura y comprensión del documento. |
+| `serve_file` | `serveFile()` | Recupera un archivo de la API remota (`API_LOGIN_URI` + `file_path`) y lo transmite al navegador del cliente. |
 
 ---
 
@@ -48,7 +51,7 @@ Muestra todos los documentos del sistema cuya versión es la más reciente (`is_
 
 #### Ejemplo de URL:
 ```http
-GET http://localhost/qualitydoc/index.php?action=index
+GET http://localhost:8080/index.php?action=index
 ```
 
 ---
@@ -76,7 +79,7 @@ Muestra el visor del documento solicitado, recupera su historial completo de ver
 
 #### Ejemplo de URL:
 ```http
-GET http://localhost/qualitydoc/index.php?action=view&id=d3b07384-d113-4ec2-a5d6-848e658e4521
+GET http://localhost:8080/index.php?action=view&id=d3b07384-d113-4ec2-a5d6-848e658e4521
 ```
 
 ---
@@ -111,7 +114,7 @@ Registra el acuse explícito de lectura del documento por parte del usuario.
 
 #### Ejemplo de Petición HTTP:
 ```http
-POST http://localhost/qualitydoc/index.php?action=acknowledge
+POST http://localhost:8080/index.php?action=acknowledge
 Content-Type: application/x-www-form-urlencoded
 
 document_id=d3b07384-d113-4ec2-a5d6-848e658e4521
@@ -119,7 +122,32 @@ document_id=d3b07384-d113-4ec2-a5d6-848e658e4521
 
 ---
 
-### 4. Sincronizar/Subir Documento (`upload`)
+### 4. Servir Archivo (`serve_file`)
+
+Descarga y transmite el archivo digital de un documento desde la API de Login remota al cliente web.
+
+* **Método HTTP:** `GET`
+* **Parámetro de Acción:** `action=serve_file` (enviado en la URL)
+* **Parámetros del Request:**
+
+  | Parámetro | Tipo | Ubicación | Obligatorio | Descripción |
+  | :--- | :--- | :--- | :--- | :--- |
+  | `id` | `UUID` | Query String | **Sí** | Identificador único del documento. |
+
+* **Comportamiento Interno:**
+  1. Recupera el registro del documento por su `id`.
+  2. Construye la URL remota del archivo combinando el valor de la variable de entorno `API_LOGIN_URI` (por defecto `http://host.docker.internal:5000`) con el path relativo `file_path` almacenado en la base de datos (por ejemplo, `/uploads/document.pdf`).
+  3. Realiza una petición HTTP interna para descargar el archivo del servidor remoto de forma segura.
+  4. Transmite los datos al cliente web estableciendo las cabeceras `Content-Type` y `Content-Length` correspondientes obtenidas del servidor remoto.
+
+#### Ejemplo de URL:
+```http
+GET http://localhost:8080/index.php?action=serve_file&id=d3b07384-d113-4ec2-a5d6-848e658e4521
+```
+
+---
+
+### 5. Sincronizar/Subir Documento (`upload`)
 
 Registra o actualiza la información completa de un documento y su versión en la base de datos PostgreSQL.
 
@@ -150,7 +178,7 @@ Registra o actualiza la información completa de un documento y su versión en l
 
 #### Ejemplo de Petición HTTP:
 ```http
-POST http://localhost/qualitydoc/index.php?action=upload
+POST http://localhost:8080/index.php?action=upload
 Content-Type: application/json
 
 {
@@ -238,12 +266,12 @@ Para integrar la funcionalidad de "Marcar como leído" en la vista, se suele ren
 
 #### Consultar listado principal:
 ```bash
-curl -X GET "http://localhost/qualitydoc/index.php?action=index"
+curl -X GET "http://localhost:8080/index.php?action=index"
 ```
 
 #### Enviar un acuse de lectura vía terminal:
 ```bash
-curl -X POST "http://localhost/qualitydoc/index.php?action=acknowledge" \
+curl -X POST "http://localhost:8080/index.php?action=acknowledge" \
      -H "Content-Type: application/x-www-form-urlencoded" \
      -d "document_id=d3b07384-d113-4ec2-a5d6-848e658e4521"
 ```

@@ -12,7 +12,7 @@ services:
       - DOTNET_WATCH_SUPPRESS_LAUNCH_BROWSER=1
       - MongoSync__Endpoint=http://host.docker.internal:3000/api/documents
       - MongoSync__HealthEndpoint=http://host.docker.internal:3000/api/saludo
-      - PostgreSync__Endpoint=${POSTGRE_SYNC_ENDPOINT:-http://host.docker.internal/qualitydoc/index.php?action=upload}
+      - PostgreSync__Endpoint=${POSTGRE_SYNC_ENDPOINT:-http://host.docker.internal:8080/index.php?action=upload}
       # Conexión dinámica. Usa el nombre del contenedor de la DB ("mssql_db")
       - ConnectionStrings__DefaultConnection=Server=mssql_db;Database=QualityDocDB;User Id=${DB_USER};Password=${DB_PASSWORD};TrustServerCertificate=True;
     ports:
