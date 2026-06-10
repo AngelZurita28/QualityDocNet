@@ -27,6 +27,19 @@ if ! docker info > /dev/null 2>&1; then
     fi
 fi
 
+if $DOCKER_CMD compose version > /dev/null 2>&1; then
+    DOCKER_COMPOSE_CMD="$DOCKER_CMD compose"
+elif command -v docker-compose > /dev/null 2>&1; then
+    if [ "$DOCKER_CMD" = "sudo docker" ]; then
+        DOCKER_COMPOSE_CMD="sudo docker-compose"
+    else
+        DOCKER_COMPOSE_CMD="docker-compose"
+    fi
+else
+    echo -e "${RED}ERROR: No se encontro 'docker compose' ni 'docker-compose'. Por favor instala Docker Compose.${NC}"
+    exit 1
+fi
+
 # 2. Pedir credenciales con Validacion Estricta
 echo -e "\n${GREEN}Configuracion de la Base de Datos:${NC}"
 read -p "Ingresa el USUARIO que deseas usar (Enter para usar 'sa'): " dbUser
@@ -37,11 +50,10 @@ fi
 isValidPassword=false
 while [ "$isValidPassword" = false ]; do
     echo -e "\n${YELLOW}La contrasena debe tener: Minimo 8 caracteres, mayusculas, minusculas y numeros/simbolos.${NC}"
-    read -s -p "Ingresa la CONTRASENA: " dbPasswordPlain
-    echo "" # Nueva linea despues del input oculto
+    read -p "Ingresa la CONTRASENA: " dbPasswordPlain
     
-    # Expresion regular (Extended Regex) para validar complejidad
-    if echo "$dbPasswordPlain" | grep -Eq '^(?=.*[a-z])(?=.*[A-Z])(?=.*\d|.*[^\w\s]).{8,}$'; then
+    # Expresion regular (Perl Regex) para validar complejidad
+    if echo "$dbPasswordPlain" | grep -Pq '^(?=.*[a-z])(?=.*[A-Z])(?=.*\d|.*[^\w\s]).{8,}$'; then
         isValidPassword=true
         echo -e "${GREEN}Formato de contrasena valido.${NC}"
     else
@@ -67,9 +79,9 @@ fi
 
 # 4. Limpiar e Iniciar Docker
 echo -e "\n${CYAN}Limpiando contenedores anteriores (y volumenes) para evitar datos corruptos...${NC}"
-$DOCKER_CMD compose down -v
+$DOCKER_COMPOSE_CMD down -v
 echo -e "${CYAN}Levantando contenedores nuevos...${NC}"
-$DOCKER_CMD compose up -d --build
+$DOCKER_COMPOSE_CMD up -d --build
 
 # 5. Bucle de Conexion y Configuracion
 maxAttempts=20

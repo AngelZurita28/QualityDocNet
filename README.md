@@ -40,14 +40,16 @@ El script de Bash (`setup.sh`) ha sido diseñado para ser universal y compatible
 
 #### Prerrequisitos (Linux)
 1.  **Git** (ej. `sudo apt install git` o `sudo dnf install git`).
-2.  **Docker y Docker Compose plugin** (No Docker Desktop, sino el motor nativo).
+2.  **Docker Engine y Docker Compose** (A diferencia de Windows, en Linux suelen instalarse por separado).
+    *   Instala Docker Engine según tu distribución.
+    *   **Crucial:** Asegúrate de instalar también el plugin de orquestación (`sudo apt install docker-compose-plugin` o `sudo pacman -S docker-compose`).
     *   *Consideración:* El servicio de Docker debe estar activo (`sudo systemctl start docker`).
     *   El script detectará automáticamente si necesitas usar `sudo` para ejecutar los comandos de Docker, aunque se recomienda añadir tu usuario al grupo `docker` (`sudo usermod -aG docker $USER`).
 
 #### Pasos de Instalación (Linux)
 1.  **Clonar el repositorio:**
     ```bash
-    git clone <URL_DEL_REPOSITORIO>
+    git clone https://github.com/AngelZurita28/QualityDocNet.git
     cd QualityDocNet
     ```
 
