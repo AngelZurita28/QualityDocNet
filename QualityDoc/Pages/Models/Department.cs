@@ -10,8 +10,9 @@ namespace QualityDoc.Pages.Models
         [Required]
         [StringLength(100)]
         public string Name { get; set; } = string.Empty;
+        public int CompanyId { get; set; }
 
-        // Relación con Documentos
+        public Company Company { get; set; } = null!;
         public ICollection<Documento> Documents { get; set; } = new List<Documento>();
     }
 }

@@ -23,6 +23,28 @@ namespace QualityDoc.Data
                 .HasDefaultValueSql("NEWID()");
 
             modelBuilder.Entity<Documento>()
+                .Property(d => d.VersionNumber)
+                .HasColumnType("decimal(10,2)");
+
+            modelBuilder.Entity<Documento>()
+                .Property(d => d.RowVersion)
+                .IsRowVersion();
+
+            modelBuilder.Entity<Documento>()
+                .HasIndex(d => new { d.CompanyId, d.DocumentCode })
+                .IsUnique()
+                .HasFilter("[IsLatest] = 1 AND [DocumentCode] IS NOT NULL");
+
+            modelBuilder.Entity<Documento>()
+                .HasIndex(d => new { d.CompanyId, d.DocumentCode, d.VersionNumber });
+
+            modelBuilder.Entity<Documento>()
+                .HasIndex(d => new { d.CompanyId, d.StatusId });
+
+            modelBuilder.Entity<Documento>()
+                .HasIndex(d => new { d.AuthorId, d.StatusId });
+
+            modelBuilder.Entity<Documento>()
                 .HasOne(d => d.Author)
                 .WithMany()
                 .HasForeignKey(d => d.AuthorId)
@@ -49,15 +71,11 @@ namespace QualityDoc.Data
                 .WithMany(dp => dp.Documents)
                 .HasForeignKey(d => d.DepartmentId);
 
-            // Seed Departments
-            modelBuilder.Entity<Department>().HasData(
-                new Department { Id = 1, Name = "Calidad" },
-                new Department { Id = 2, Name = "Producción" },
-                new Department { Id = 3, Name = "Recursos Humanos" },
-                new Department { Id = 4, Name = "Contabilidad" },
-                new Department { Id = 5, Name = "Compras" },
-                new Department { Id = 6, Name = "Sistemas" }
-            );
+            modelBuilder.Entity<Department>()
+                .HasOne(d => d.Company)
+                .WithMany()
+                .HasForeignKey(d => d.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<Usuario>()
                 .HasOne(u => u.Rol)

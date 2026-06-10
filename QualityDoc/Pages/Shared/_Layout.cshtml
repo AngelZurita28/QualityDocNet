@@ -43,27 +43,59 @@
                                      rolUsuarioNav.Equals("SuperAdmin", StringComparison.OrdinalIgnoreCase) || 
                                      rolUsuarioNav.Equals("Súperadmin", StringComparison.OrdinalIgnoreCase) || 
                                      rolUsuarioNav.Equals("Super Admin", StringComparison.OrdinalIgnoreCase);
+                    bool showReviewer = rolUsuarioNav.Equals("Reviewer", StringComparison.OrdinalIgnoreCase);
+                    bool canCreateDraft = rolUsuarioNav.Equals("Redacter", StringComparison.OrdinalIgnoreCase) ||
+                                          rolUsuarioNav.Equals("Redactor", StringComparison.OrdinalIgnoreCase);
+                    string documentsNavLabel = canCreateDraft
+                        ? "Mis Documentos"
+                        : showReviewer
+                            ? "Revision"
+                            : showAdmin
+                                ? "Aprobacion"
+                                : "Documentos";
 
                     int pendingApprovals = 0;
                     int rejectedDocs = 0;
+                    var availableDepartments = DbContext.Departments.Where(d => false).OrderBy(d => d.Name).ToList();
 
                     if (userIdVal.HasValue)
                     {
                         var currentUser = DbContext.Users.Find(userIdVal.Value);
                         if (currentUser != null)
                         {
-                            rejectedDocs = DbContext.Documents.Count(d => d.AuthorId == currentUser.Id && d.StatusId == 4 && d.IsLatest);
+                            canCreateDraft = canCreateDraft && currentUser.CompanyId != null;
+                            if (currentUser.CompanyId != null)
+                            {
+                                availableDepartments = DbContext.Departments
+                                    .Where(d => d.CompanyId == currentUser.CompanyId)
+                                    .OrderBy(d => d.Name)
+                                    .ToList();
+                            }
+
+                            rejectedDocs = DbContext.Documents.Count(d => d.AuthorId == currentUser.Id && d.StatusId == 4);
 
                             if (showAdmin)
                             {
                                 bool isSuper = rolUsuarioNav.Contains("Super", StringComparison.OrdinalIgnoreCase);
                                 if (isSuper) {
-                                    pendingApprovals = DbContext.Documents.Count(d => d.StatusId == 2 && d.IsLatest);
+                                    pendingApprovals = DbContext.Documents.Count(d => d.StatusId == 3);
                                 } else {
-                                    pendingApprovals = DbContext.Documents.Count(d => d.StatusId == 2 && d.CompanyId == currentUser.CompanyId && d.IsLatest && d.AuthorId != currentUser.Id);
+                                    pendingApprovals = DbContext.Documents.Count(d => d.StatusId == 3 && d.CompanyId == currentUser.CompanyId && d.AuthorId != currentUser.Id);
                                 }
                             }
+                            else if (showReviewer)
+                            {
+                                pendingApprovals = DbContext.Documents.Count(d => d.StatusId == 2 && d.CompanyId == currentUser.CompanyId && d.AuthorId != currentUser.Id);
+                            }
                         }
+                        else
+                        {
+                            canCreateDraft = false;
+                        }
+                    }
+                    else
+                    {
+                        canCreateDraft = false;
                     }
                 }
 
@@ -85,7 +117,7 @@
                    class="flex items-center justify-between p-3 rounded-lg transition hover:bg-gray-50 text-gray-600 @(Context.Request.Path.StartsWithSegments("/Documents/List") ? "sidebar-active" : "")">
                     <div class="flex items-center gap-3">
                         <span class="material-symbols-outlined">folder_open</span>
-                        Mis Documentos
+                        @documentsNavLabel
                     </div>
                     @if (rejectedDocs > 0)
                     {
@@ -104,8 +136,7 @@
                     </a>
                 }
 
-                @if (!rolUsuarioNav.Equals("Operador", StringComparison.OrdinalIgnoreCase) && 
-                     !rolUsuarioNav.Equals("Operator", StringComparison.OrdinalIgnoreCase))
+                @if (canCreateDraft)
                 {
                     <div class="pt-4 mt-4 border-t">
                         <button onclick="openModal()"
@@ -182,7 +213,7 @@
                             <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Departamento</label>
                             <select name="SelectedDepartmentId" class="w-full border-2 border-gray-100 rounded-xl px-4 py-2 focus:border-blue-400 outline-none transition" required>
                                 <option value="">Selecciona un área...</option>
-                                @foreach (var dept in DbContext.Departments.OrderBy(d => d.Name))
+                                @foreach (var dept in availableDepartments)
                                 {
                                     <option value="@dept.Id">@dept.Name</option>
                                 }

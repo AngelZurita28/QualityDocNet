@@ -7,6 +7,7 @@ using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
 using QualityDoc.Helpers;
+using QualityDoc.Services;
 
 namespace QualityDoc.Pages.Documents
 {
@@ -16,12 +17,16 @@ namespace QualityDoc.Pages.Documents
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IWebHostEnvironment _env;
         private readonly IConfiguration _configuration;
+        private readonly RolePermissionService _permissions;
 
         public List<Documento> Documentos { get; set; } = new();
 
         public int PageNumber { get; set; } = 1;
         public int TotalPages { get; set; }
         public int PageSize { get; set; } = 15; 
+        public string PageTitle { get; set; } = "Documentos";
+        public string PageDescription { get; set; } = "Listado de documentos";
+        public List<StatusOption> StatusOptions { get; set; } = new();
 
         [BindProperty(SupportsGet = true)]
         public string? SearchTerm { get; set; }
@@ -29,12 +34,19 @@ namespace QualityDoc.Pages.Documents
         [BindProperty(SupportsGet = true)]
         public int? StatusFilter { get; set; } 
 
-        public ListModel(AppDbContext context, IHttpClientFactory httpClientFactory, IWebHostEnvironment env, IConfiguration configuration)
+        public class StatusOption
+        {
+            public int Id { get; set; }
+            public string Label { get; set; } = string.Empty;
+        }
+
+        public ListModel(AppDbContext context, IHttpClientFactory httpClientFactory, IWebHostEnvironment env, IConfiguration configuration, RolePermissionService permissions)
         {
             _context = context;
             _httpClientFactory = httpClientFactory;
             _env = env;
             _configuration = configuration;
+            _permissions = permissions;
         }
 
         public IActionResult OnGet(int pageNumber = 1)
@@ -48,42 +60,97 @@ namespace QualityDoc.Pages.Documents
             if (usuario == null) return RedirectToPage("/Login");
 
             var rolName = HttpContext.Session.GetString("Rol") ?? "";
-            bool isSuperAdmin = rolName.Trim().Equals("SuperAdmin", StringComparison.OrdinalIgnoreCase) || 
-                                rolName.Trim().Equals("Super Admin", StringComparison.OrdinalIgnoreCase) ||
-                                rolName.Trim().Equals("Súperadmin", StringComparison.OrdinalIgnoreCase);
-            bool isRedacter = rolName.Trim().Equals("Redacter", StringComparison.OrdinalIgnoreCase) ||
-                              rolName.Trim().Equals("Redactor", StringComparison.OrdinalIgnoreCase);
-            bool isOperador = rolName.Trim().Equals("Operador", StringComparison.OrdinalIgnoreCase) ||
-                              rolName.Trim().Equals("Operator", StringComparison.OrdinalIgnoreCase);
-
             PageNumber = pageNumber;
 
             var query = _context.Documents.AsQueryable();
+            List<int> allowedStatuses;
+            int? defaultStatus = null;
 
-            if (isSuperAdmin)
+            if (_permissions.IsSuperAdmin(rolName))
             {
-                // Súperadmin ve los de cualquier empresa
+                PageTitle = "Aprobacion de Documentos";
+                PageDescription = "Candidatos pendientes y listas de versiones finales";
+                allowedStatuses = new List<int>
+                {
+                    DocumentWorkflowConstants.Status.Candidate,
+                    DocumentWorkflowConstants.Status.Active,
+                    DocumentWorkflowConstants.Status.Rejected,
+                    DocumentWorkflowConstants.Status.Obsolete
+                };
+                defaultStatus = DocumentWorkflowConstants.Status.Candidate;
             }
-            else if (isRedacter)
+            else if (_permissions.IsRedacter(rolName))
             {
-                // Redacter solo ve sus propios documentos
+                PageTitle = "Mis Documentos";
+                PageDescription = "Documentos redactados por ti";
                 query = query.Where(d => d.AuthorId == userId.Value);
+                allowedStatuses = new List<int>
+                {
+                    DocumentWorkflowConstants.Status.Draft,
+                    DocumentWorkflowConstants.Status.InReview,
+                    DocumentWorkflowConstants.Status.Candidate,
+                    DocumentWorkflowConstants.Status.Rejected,
+                    DocumentWorkflowConstants.Status.Active,
+                    DocumentWorkflowConstants.Status.Obsolete
+                };
             }
-            else if (isOperador)
+            else if (_permissions.IsOperador(rolName))
             {
-                // Operador no puede ver nada
+                PageTitle = "Documentos";
+                PageDescription = "El rol operador no tiene documentos asignados";
                 query = query.Where(d => false);
+                allowedStatuses = new List<int>();
+            }
+            else if (_permissions.IsReviewer(rolName))
+            {
+                PageTitle = "Revision de Documentos";
+                PageDescription = "Documentos pendientes de revision y listas de consulta";
+                query = query.Where(d => d.CompanyId == usuario.CompanyId);
+                allowedStatuses = new List<int>
+                {
+                    DocumentWorkflowConstants.Status.InReview,
+                    DocumentWorkflowConstants.Status.Active,
+                    DocumentWorkflowConstants.Status.Rejected,
+                    DocumentWorkflowConstants.Status.Obsolete
+                };
+                defaultStatus = DocumentWorkflowConstants.Status.InReview;
             }
             else
             {
-                // Aprobadores y Admins ven los de su empresa
+                PageTitle = "Aprobacion de Documentos";
+                PageDescription = "Documentos pendientes de aprobacion final y listas de consulta";
                 query = query.Where(d => d.CompanyId == usuario.CompanyId);
+                allowedStatuses = new List<int>
+                {
+                    DocumentWorkflowConstants.Status.Candidate,
+                    DocumentWorkflowConstants.Status.Active,
+                    DocumentWorkflowConstants.Status.Rejected,
+                    DocumentWorkflowConstants.Status.Obsolete
+                };
+                defaultStatus = DocumentWorkflowConstants.Status.Candidate;
             }
 
             if (!string.IsNullOrWhiteSpace(SearchTerm))
             {
                 var term = SearchTerm.Trim();
                 query = query.Where(d => d.Title.Contains(term) || (d.DocumentCode != null && d.DocumentCode.Contains(term)));
+            }
+
+            StatusOptions = BuildStatusOptions(allowedStatuses, rolName);
+
+            if (StatusFilter.HasValue && !allowedStatuses.Contains(StatusFilter.Value))
+            {
+                StatusFilter = defaultStatus;
+            }
+
+            if (!StatusFilter.HasValue && defaultStatus.HasValue)
+            {
+                StatusFilter = defaultStatus;
+            }
+
+            if (allowedStatuses.Any())
+            {
+                query = query.Where(d => allowedStatuses.Contains(d.StatusId));
             }
 
             if (StatusFilter.HasValue && StatusFilter.Value > 0)
@@ -108,6 +175,31 @@ namespace QualityDoc.Pages.Documents
             return Page();
         }
 
+        private static List<StatusOption> BuildStatusOptions(List<int> statuses, string roleName)
+        {
+            bool isReviewer = roleName.Trim().Equals("Reviewer", StringComparison.OrdinalIgnoreCase);
+            bool isAdminLike = roleName.Trim().Equals("Admin", StringComparison.OrdinalIgnoreCase)
+                || roleName.Trim().Equals("Administrador", StringComparison.OrdinalIgnoreCase)
+                || roleName.Trim().Equals("SuperAdmin", StringComparison.OrdinalIgnoreCase)
+                || roleName.Trim().Equals("Super Admin", StringComparison.OrdinalIgnoreCase)
+                || roleName.Trim().Equals("Súperadmin", StringComparison.OrdinalIgnoreCase);
+
+            return statuses.Select(status => new StatusOption
+            {
+                Id = status,
+                Label = status switch
+                {
+                    DocumentWorkflowConstants.Status.Draft => "Borradores",
+                    DocumentWorkflowConstants.Status.InReview => isReviewer ? "Pendientes de revision" : "En revision",
+                    DocumentWorkflowConstants.Status.Candidate => isAdminLike ? "Pendientes de aprobacion" : "Candidatas",
+                    DocumentWorkflowConstants.Status.Rejected => "Rechazados",
+                    DocumentWorkflowConstants.Status.Active => "Vigentes",
+                    DocumentWorkflowConstants.Status.Obsolete => "Obsoletos",
+                    _ => "Estado"
+                }
+            }).ToList();
+        }
+
         public async Task<IActionResult> OnPostSyncAsync(Guid id)
         {
             var userId = HttpContext.Session.GetInt32("UserId");
@@ -116,8 +208,7 @@ namespace QualityDoc.Pages.Documents
                 return RedirectToPage("/Login");
 
             var rolName = HttpContext.Session.GetString("Rol") ?? "";
-            if (rolName.Trim().Equals("Operador", StringComparison.OrdinalIgnoreCase) ||
-                rolName.Trim().Equals("Operator", StringComparison.OrdinalIgnoreCase))
+            if (_permissions.IsOperador(rolName))
             {
                 return BadRequest("El rol Operador no tiene permisos para sincronizar.");
             }
@@ -126,6 +217,12 @@ namespace QualityDoc.Pages.Documents
 
             if (documento == null)
                 return RedirectToPage();
+
+            var usuario = await _context.Users.Include(u => u.Rol).FirstOrDefaultAsync(u => u.Id == userId.Value);
+            if (usuario == null || !_permissions.CanViewDocument(usuario, rolName, documento) || documento.StatusId != DocumentWorkflowConstants.Status.Active)
+            {
+                return BadRequest("No tienes permiso para sincronizar este documento.");
+            }
 
             // Si ya está sincronizado, no hacer nada (por si el botón se pica dos veces)
             if (documento.SyncFirebase)
@@ -193,8 +290,7 @@ namespace QualityDoc.Pages.Documents
                 return RedirectToPage("/Login");
 
             var rolName = HttpContext.Session.GetString("Rol") ?? "";
-            if (rolName.Trim().Equals("Operador", StringComparison.OrdinalIgnoreCase) ||
-                rolName.Trim().Equals("Operator", StringComparison.OrdinalIgnoreCase))
+            if (_permissions.IsOperador(rolName))
             {
                 return BadRequest("El rol Operador no tiene permisos para sincronizar.");
             }
@@ -206,6 +302,12 @@ namespace QualityDoc.Pages.Documents
 
             if (documento == null)
                 return RedirectToPage();
+
+            var usuario = await _context.Users.Include(u => u.Rol).FirstOrDefaultAsync(u => u.Id == userId.Value);
+            if (usuario == null || !_permissions.CanViewDocument(usuario, rolName, documento) || documento.StatusId != DocumentWorkflowConstants.Status.Active)
+            {
+                return BadRequest("No tienes permiso para sincronizar este documento.");
+            }
 
             var connString = _configuration.GetConnectionString("PostgresConnection");
             if (string.IsNullOrEmpty(connString))

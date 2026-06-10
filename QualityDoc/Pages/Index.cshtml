@@ -26,11 +26,14 @@
             <p class="text-gray-500 text-xs">Administra, sincroniza y aprueba documentos</p>
         </div>
 
-        <button onclick="openModal()"
-                class="bg-blue-600 text-white px-4 py-2 rounded-lg text-xs flex items-center gap-2 hover:bg-blue-700 transition shadow-lg shadow-blue-100">
-            <span class="material-symbols-outlined text-[16px]">add</span>
-            Nuevo Documento
-        </button>
+        @if (Model.CanCreateDraft)
+        {
+            <button onclick="openModal()"
+                    class="bg-blue-600 text-white px-4 py-2 rounded-lg text-xs flex items-center gap-2 hover:bg-blue-700 transition shadow-lg shadow-blue-100">
+                <span class="material-symbols-outlined text-[16px]">add</span>
+                Nuevo Documento
+            </button>
+        }
     </div>
 
     <!-- Tarjetas Resumen -->
@@ -60,8 +63,8 @@
                 <span class="material-symbols-outlined text-2xl">check_circle</span>
             </div>
             <div>
-                <p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Aprobados</p>
-                <p class="text-2xl font-black text-gray-800">@Model.CountAprobado</p>
+                <p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Activos</p>
+                <p class="text-2xl font-black text-gray-800">@Model.CountActivo</p>
             </div>
         </div>
 
@@ -103,19 +106,21 @@
         const deptLabels = @Html.Raw(Json.Serialize(Model.DeptStats.Select(s => s.Name)));
         const borradorData = @Html.Raw(Json.Serialize(Model.DeptStats.Select(s => s.Borrador)));
         const revisionData = @Html.Raw(Json.Serialize(Model.DeptStats.Select(s => s.Revision)));
-        const aprobadoData = @Html.Raw(Json.Serialize(Model.DeptStats.Select(s => s.Aprobado)));
+        const candidataData = @Html.Raw(Json.Serialize(Model.DeptStats.Select(s => s.Candidata)));
         const rechazadoData = @Html.Raw(Json.Serialize(Model.DeptStats.Select(s => s.Rechazado)));
+        const activoData = @Html.Raw(Json.Serialize(Model.DeptStats.Select(s => s.Activo)));
+        const obsoletoData = @Html.Raw(Json.Serialize(Model.DeptStats.Select(s => s.Obsoleto)));
 
         // Status Chart (Pie)
         const ctxStatus = document.getElementById('statusChart').getContext('2d');
         new Chart(ctxStatus, {
             type: 'pie',
             data: {
-                labels: ['Borrador', 'En Revisión', 'Aprobado', 'Rechazado'],
+                labels: ['Borrador', 'En Revisión', 'Candidata', 'Rechazado', 'Activo', 'Obsoleto'],
                 datasets: [{
-                    data: [@Model.CountBorrador, @Model.CountRevision, @Model.CountAprobado, @Model.CountRechazado],
-                    backgroundColor: ['#e2e8f0', '#fef08a', '#bbf7d0', '#fecaca'],
-                    borderColor: ['#94a3b8', '#facc15', '#4ade80', '#f87171'],
+                    data: [@Model.CountBorrador, @Model.CountRevision, @Model.CountCandidata, @Model.CountRechazado, @Model.CountActivo, @Model.CountObsoleto],
+                    backgroundColor: ['#e2e8f0', '#fef08a', '#bfdbfe', '#fecaca', '#bbf7d0', '#e5e7eb'],
+                    borderColor: ['#94a3b8', '#facc15', '#60a5fa', '#f87171', '#4ade80', '#9ca3af'],
                     borderWidth: 1
                 }]
             },
@@ -136,8 +141,10 @@
                 datasets: [
                     { label: 'Borrador', data: borradorData, backgroundColor: '#e2e8f0' },
                     { label: 'Revisión', data: revisionData, backgroundColor: '#fef08a' },
-                    { label: 'Aprobado', data: aprobadoData, backgroundColor: '#bbf7d0' },
-                    { label: 'Rechazado', data: rechazadoData, backgroundColor: '#fecaca' }
+                    { label: 'Candidata', data: candidataData, backgroundColor: '#bfdbfe' },
+                    { label: 'Rechazado', data: rechazadoData, backgroundColor: '#fecaca' },
+                    { label: 'Activo', data: activoData, backgroundColor: '#bbf7d0' },
+                    { label: 'Obsoleto', data: obsoletoData, backgroundColor: '#e5e7eb' }
                 ]
             },
             options: {

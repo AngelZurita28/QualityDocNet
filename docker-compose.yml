@@ -18,7 +18,7 @@ services:
       - ./QualityDoc:/app                      
       - ./uploads_compartidos:/app/wwwroot/uploads 
     working_dir: /app
-    command: bash -c "npm install && dotnet watch run --no-launch-profile"
+    command: bash -c "npm install && dotnet run --no-launch-profile"
     depends_on:
       - mssql_db
 

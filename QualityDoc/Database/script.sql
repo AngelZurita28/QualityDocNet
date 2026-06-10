@@ -65,6 +65,7 @@ GO
 CREATE TABLE [dbo].[Departments](
 	[Id] [int] IDENTITY(1,1) NOT NULL,
 	[Name] [nvarchar](100) NOT NULL,
+	[CompanyId] [int] NOT NULL,
 PRIMARY KEY CLUSTERED 
 (
 	[Id] ASC
@@ -79,7 +80,7 @@ GO
 CREATE TABLE [dbo].[Documents](
 	[Id] [uniqueidentifier] NOT NULL,
 	[ParentId] [uniqueidentifier] NULL,
-	[VersionNumber] [int] NULL,
+	[VersionNumber] [decimal](10, 2) NULL,
 	[IsLatest] [bit] NULL,
 	[Title] [varchar](200) NOT NULL,
 	[Description] [text] NULL,
@@ -91,6 +92,7 @@ CREATE TABLE [dbo].[Documents](
 	[SyncPostgre] [bit] NULL,
 	[SyncFirebase] [bit] NULL,
 	[LastErrorLog] [text] NULL,
+	[RowVersion] [rowversion] NOT NULL,
 	[DocumentCode] [varchar](50) NULL,
 	[DepartmentId] [int] NULL,
 PRIMARY KEY CLUSTERED 
@@ -168,9 +170,7 @@ ALTER TABLE [dbo].[Companies] ADD  DEFAULT (getdate()) FOR [CreatedAt]
 GO
 ALTER TABLE [dbo].[Documents] ADD  DEFAULT (newid()) FOR [Id]
 GO
-ALTER TABLE [dbo].[Documents] ADD  DEFAULT ((1)) FOR [VersionNumber]
-GO
-ALTER TABLE [dbo].[Documents] ADD  DEFAULT ((1)) FOR [IsLatest]
+ALTER TABLE [dbo].[Documents] ADD  DEFAULT ((0)) FOR [IsLatest]
 GO
 ALTER TABLE [dbo].[Documents] ADD  DEFAULT (getdate()) FOR [CreatedAt]
 GO
@@ -205,6 +205,11 @@ REFERENCES [dbo].[Departments] ([Id])
 GO
 ALTER TABLE [dbo].[Documents] CHECK CONSTRAINT [FK_Documents_Departments]
 GO
+ALTER TABLE [dbo].[Departments]  WITH CHECK ADD  CONSTRAINT [FK_Departments_Companies] FOREIGN KEY([CompanyId])
+REFERENCES [dbo].[Companies] ([Id])
+GO
+ALTER TABLE [dbo].[Departments] CHECK CONSTRAINT [FK_Departments_Companies]
+GO
 ALTER TABLE [dbo].[Users]  WITH CHECK ADD FOREIGN KEY([CompanyId])
 REFERENCES [dbo].[Companies] ([Id])
 GO
@@ -215,6 +220,23 @@ ALTER TABLE [dbo].[Users]  WITH CHECK ADD  CONSTRAINT [FK_Users_Departments] FOR
 REFERENCES [dbo].[Departments] ([Id])
 GO
 ALTER TABLE [dbo].[Users] CHECK CONSTRAINT [FK_Users_Departments]
+GO
+
+CREATE UNIQUE INDEX [UX_Documents_ActiveVersion]
+ON [dbo].[Documents]([CompanyId], [DocumentCode])
+WHERE [IsLatest] = 1 AND [DocumentCode] IS NOT NULL
+GO
+
+CREATE INDEX [IX_Documents_DocumentCode_VersionNumber]
+ON [dbo].[Documents]([CompanyId], [DocumentCode], [VersionNumber])
+GO
+
+CREATE INDEX [IX_Documents_CompanyId_StatusId]
+ON [dbo].[Documents]([CompanyId], [StatusId])
+GO
+
+CREATE INDEX [IX_Documents_AuthorId_StatusId]
+ON [dbo].[Documents]([AuthorId], [StatusId])
 GO
 
 -- 4. Insertar datos por defecto
@@ -234,18 +256,20 @@ SET IDENTITY_INSERT [dbo].[Companies] OFF;
 GO
 
 SET IDENTITY_INSERT [dbo].[Departments] ON;
-INSERT INTO [dbo].[Departments] ([Id], [Name]) VALUES (1, 'E1 - Departamento A');
-INSERT INTO [dbo].[Departments] ([Id], [Name]) VALUES (2, 'E1 - Departamento B');
-INSERT INTO [dbo].[Departments] ([Id], [Name]) VALUES (3, 'E2 - Departamento C');
-INSERT INTO [dbo].[Departments] ([Id], [Name]) VALUES (4, 'E2 - Departamento D');
+INSERT INTO [dbo].[Departments] ([Id], [Name], [CompanyId]) VALUES (1, 'E1 - Departamento A', 1);
+INSERT INTO [dbo].[Departments] ([Id], [Name], [CompanyId]) VALUES (2, 'E1 - Departamento B', 1);
+INSERT INTO [dbo].[Departments] ([Id], [Name], [CompanyId]) VALUES (3, 'E2 - Departamento C', 2);
+INSERT INTO [dbo].[Departments] ([Id], [Name], [CompanyId]) VALUES (4, 'E2 - Departamento D', 2);
 SET IDENTITY_INSERT [dbo].[Departments] OFF;
 GO
 
 SET IDENTITY_INSERT [dbo].[DocumentStatus] ON;
 INSERT INTO [dbo].[DocumentStatus] ([Id], [Name]) VALUES (1, 'Borrador');
 INSERT INTO [dbo].[DocumentStatus] ([Id], [Name]) VALUES (2, 'En Revision');
-INSERT INTO [dbo].[DocumentStatus] ([Id], [Name]) VALUES (3, 'Aprobado');
+INSERT INTO [dbo].[DocumentStatus] ([Id], [Name]) VALUES (3, 'Candidata');
 INSERT INTO [dbo].[DocumentStatus] ([Id], [Name]) VALUES (4, 'Rechazado');
+INSERT INTO [dbo].[DocumentStatus] ([Id], [Name]) VALUES (5, 'Activo');
+INSERT INTO [dbo].[DocumentStatus] ([Id], [Name]) VALUES (6, 'Obsoleto');
 SET IDENTITY_INSERT [dbo].[DocumentStatus] OFF;
 GO
 

@@ -6,6 +6,8 @@
 # User-specific files
 .env
 *.env
+uploads_compartidos
+IMPLEMENTATION_PLAN.md
 
 *.rsuser
 *.suo

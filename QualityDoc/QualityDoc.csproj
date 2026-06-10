@@ -21,4 +21,10 @@
     <Folder Include="wwwroot\uploads\" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Remove="wwwroot\uploads\**" />
+    <None Include="wwwroot\uploads\**" />
+    <Watch Remove="wwwroot\uploads\**" />
+  </ItemGroup>
+
 </Project>

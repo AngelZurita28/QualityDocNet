@@ -6,6 +6,7 @@ using QualityDoc.Pages.Models;
 using System.Net.Http.Json;
 using QualityDoc.Helpers;
 using Microsoft.Extensions.Configuration;
+using QualityDoc.Services;
 
 namespace QualityDoc.Pages.Documents
 {
@@ -13,12 +14,17 @@ namespace QualityDoc.Pages.Documents
     {
         private readonly AppDbContext _context;
         private readonly IWebHostEnvironment _env;
+        private readonly DocumentVersionService _versionService;
+        private readonly RolePermissionService _permissions;
 
         public Documento? Documento { get; set; }
         public List<Documento> VersionesAnteriores { get; set; } = new();
         public List<ApprovalHistory> Historial { get; set; } = new();
         public int CurrentUserId { get; set; }
         public bool CanApprove { get; set; } = false;
+        public bool CanReviewerApprove { get; set; } = false;
+        public bool CanAdminFinalize { get; set; } = false;
+        public bool CanSendReview { get; set; } = false;
         public bool CanEdit { get; set; } = false;
 
         [BindProperty]
@@ -34,46 +40,22 @@ namespace QualityDoc.Pages.Documents
 
         private readonly IConfiguration _configuration;
 
-        public ApprovalModel(AppDbContext context, IWebHostEnvironment env, IConfiguration configuration)
+        public ApprovalModel(AppDbContext context, IWebHostEnvironment env, IConfiguration configuration, DocumentVersionService versionService, RolePermissionService permissions)
         {
             _context = context;
             _env = env;
             _configuration = configuration;
+            _versionService = versionService;
+            _permissions = permissions;
         }
 
-        private bool CheckApprovalPermissions(Documento doc, int userId)
-        {
-            var currentUser = _context.Users.Include(u => u.Rol).FirstOrDefault(u => u.Id == userId);
-            if (currentUser == null || doc == null) return false;
-
-            bool isAuthor = doc.AuthorId == userId;
-            string rolName = currentUser.Rol?.Name?.Trim() ?? "";
-
-            bool isAdmin = rolName.Equals("Admin", StringComparison.OrdinalIgnoreCase) || 
-                           rolName.Equals("Administrador", StringComparison.OrdinalIgnoreCase);
-
-            bool isSuperAdmin = rolName.Equals("SuperAdmin", StringComparison.OrdinalIgnoreCase) || 
-                                rolName.Equals("Super Admin", StringComparison.OrdinalIgnoreCase) ||
-                                rolName.Equals("Súperadmin", StringComparison.OrdinalIgnoreCase);
-
-            bool isSameCompany = doc.CompanyId == currentUser.CompanyId;
-
-            // El autor NUNCA puede aprobar su propio documento.
-            // Solo Admins de la misma empresa o SuperAdmins globales pueden aprobar.
-            // Esto excluye automáticamente al rol "Operador".
-            if (isAuthor) return false;
-            
-            return (isAdmin && isSameCompany) || isSuperAdmin;
-        }
-
-        public IActionResult OnGet(Guid? id)
+        public async Task<IActionResult> OnGetAsync(Guid? id)
         {
             var userId = HttpContext.Session.GetInt32("UserId");
             if (userId == null) return RedirectToPage("/Login");
 
             var rolName = HttpContext.Session.GetString("Rol") ?? "";
-            if (rolName.Trim().Equals("Operador", StringComparison.OrdinalIgnoreCase) ||
-                rolName.Trim().Equals("Operator", StringComparison.OrdinalIgnoreCase))
+            if (_permissions.IsOperador(rolName))
             {
                 return RedirectToPage("/Index");
             }
@@ -82,167 +64,95 @@ namespace QualityDoc.Pages.Documents
 
             if (id != null)
             {
-                Documento = _context.Documents
+                Documento = await _context.Documents
                     .Include(d => d.Author)
                     .Include(d => d.Company)
                     .Include(d => d.Status)
                     .Include(d => d.Department)
-                    .FirstOrDefault(d => d.Id == id);
+                    .FirstOrDefaultAsync(d => d.Id == id);
 
                 if (Documento != null)
                 {
-                    var currentUser = _context.Users.Include(u => u.Rol).FirstOrDefault(u => u.Id == CurrentUserId);
-                    bool isSuperAdmin = currentUser?.Rol?.Name?.Trim().Equals("SuperAdmin", StringComparison.OrdinalIgnoreCase) == true
-                                     || currentUser?.Rol?.Name?.Trim().Equals("Super Admin", StringComparison.OrdinalIgnoreCase) == true
-                                     || currentUser?.Rol?.Name?.Trim().Equals("Súperadmin", StringComparison.OrdinalIgnoreCase) == true;
-                                     
-                    if (Documento.CompanyId != currentUser?.CompanyId && !isSuperAdmin)
+                    var currentUser = await _context.Users.Include(u => u.Rol).FirstOrDefaultAsync(u => u.Id == CurrentUserId);
+                    if (currentUser == null || !_permissions.CanViewDocument(currentUser, rolName, Documento))
                     {
                         return RedirectToPage("/Index");
                     }
 
-                    CanApprove = CheckApprovalPermissions(Documento, CurrentUserId);
-
-                    bool isAuthor = Documento.AuthorId == CurrentUserId;
-
-                    // SuperAdmin edita todo. Autor edita lo suyo (según instrucción "y si no esta también hazlo").
-                    CanEdit = isSuperAdmin || isAuthor;
+                    CanReviewerApprove = _permissions.CanReviewerApprove(currentUser, rolName, Documento);
+                    CanAdminFinalize = _permissions.CanAdminFinalize(currentUser, rolName, Documento);
+                    CanApprove = CanReviewerApprove || CanAdminFinalize;
+                    CanSendReview = _permissions.CanSendToReview(currentUser, rolName, Documento);
+                    CanEdit = _permissions.CanEditDraft(currentUser, rolName, Documento);
 
                     EditTitle = Documento.Title;
                     EditDescription = Documento.Description ?? "";
                     EditDepartmentId = Documento.DepartmentId ?? 0;
 
-                    DepartmentsList = _context.Departments.OrderBy(d => d.Name).ToList();
+                    DepartmentsList = _permissions.IsSuperAdmin(rolName)
+                        ? await _context.Departments.OrderBy(d => d.Name).ToListAsync()
+                        : await _context.Departments
+                            .Where(d => d.CompanyId == currentUser.CompanyId)
+                            .OrderBy(d => d.Name)
+                            .ToListAsync();
 
-                    Historial = _context.ApprovalHistory
+                    Historial = await _context.ApprovalHistory
                         .Include(h => h.User)
                         .Where(h => h.DocumentId == id)
                         .OrderByDescending(h => h.ActionDate)
-                        .ToList();
+                        .ToListAsync();
 
-                    VersionesAnteriores = _context.Documents
-                        .Where(d => d.DocumentCode == Documento.DocumentCode && d.Id != Documento.Id)
-                        .OrderByDescending(d => d.VersionNumber)
-                        .ToList();
+                    VersionesAnteriores = await _versionService.GetRealVersionHistoryAsync(Documento.DocumentCode, Documento.CompanyId, Documento.Id);
                 }
             }
 
             return Page();
         }
 
-        public IActionResult OnPostSendReview(Guid id)
+        public async Task<IActionResult> OnPostSendReviewAsync(Guid id)
         {
             var userId = HttpContext.Session.GetInt32("UserId");
             if (userId == null) return RedirectToPage("/Login");
 
-            var rolName = HttpContext.Session.GetString("Rol") ?? "";
-            if (rolName.Trim().Equals("Operador", StringComparison.OrdinalIgnoreCase) ||
-                rolName.Trim().Equals("Operator", StringComparison.OrdinalIgnoreCase))
-            {
-                return BadRequest("El rol Operador no tiene permisos para realizar esta acción.");
-            }
-
-            var doc = _context.Documents.FirstOrDefault(d => d.Id == id);
-            if (doc != null && doc.AuthorId == userId.Value && (doc.StatusId == 1 || doc.StatusId == 4))
-            {
-                doc.StatusId = 2; // En Revisión
-
-                _context.ApprovalHistory.Add(new ApprovalHistory
-                {
-                    DocumentId = doc.Id,
-                    UserId = userId.Value,
-                    Action = "Enviado a Revisión",
-                    Comment = "El autor envió el documento para su revisión.",
-                    ActionDate = DateTime.Now
-                });
-
-                _context.SaveChanges();
-                TempData["SuccessMessage"] = "El documento ha sido enviado a revisión exitosamente.";
-            }
-            else
-            {
-                TempData["ErrorMessage"] = "No tienes permiso para realizar esta acción.";
-            }
+            var result = await _versionService.AssignReviewVersionAsync(id, userId.Value);
+            TempData[result.Success ? "SuccessMessage" : "ErrorMessage"] = result.Message;
 
             return RedirectToPage("/Documents/List");
         }
 
-        public IActionResult OnPostApprove(Guid id)
+        public async Task<IActionResult> OnPostApproveAsync(Guid id)
         {
             var userId = HttpContext.Session.GetInt32("UserId");
             if (userId == null) return RedirectToPage("/Login");
 
-            var rolName = HttpContext.Session.GetString("Rol") ?? "";
-            if (rolName.Trim().Equals("Operador", StringComparison.OrdinalIgnoreCase) ||
-                rolName.Trim().Equals("Operator", StringComparison.OrdinalIgnoreCase))
-            {
-                return BadRequest("El rol Operador no tiene permisos para realizar esta acción.");
-            }
-
-            var doc = _context.Documents.FirstOrDefault(d => d.Id == id);
-
-            if (doc != null && doc.StatusId == 2 && CheckApprovalPermissions(doc, userId.Value))
-            {
-                doc.StatusId = 3; // Aprobado
-
-                _context.ApprovalHistory.Add(new ApprovalHistory
-                {
-                    DocumentId = doc.Id,
-                    UserId = userId.Value,
-                    Action = "Aprobado",
-                    Comment = "El documento ha sido aprobado y es la versión vigente.",
-                    ActionDate = DateTime.Now
-                });
-
-                _context.SaveChanges();
-                TempData["SuccessMessage"] = "Documento aprobado correctamente.";
-            }
-            else
-            {
-                TempData["ErrorMessage"] = "No tienes permiso para aprobar este documento.";
-            }
+            var result = await _versionService.ReviewerApproveAsync(id, userId.Value);
+            TempData[result.Success ? "SuccessMessage" : "ErrorMessage"] = result.Message;
 
             return RedirectToPage("/Documents/List");
         }
 
-        public IActionResult OnPostReject(Guid id, string rejectionComment)
+        public async Task<IActionResult> OnPostRejectAsync(Guid id, string rejectionComment)
         {
             var userId = HttpContext.Session.GetInt32("UserId");
             if (userId == null) return RedirectToPage("/Login");
 
-            var rolName = HttpContext.Session.GetString("Rol") ?? "";
-            if (rolName.Trim().Equals("Operador", StringComparison.OrdinalIgnoreCase) ||
-                rolName.Trim().Equals("Operator", StringComparison.OrdinalIgnoreCase))
-            {
-                return BadRequest("El rol Operador no tiene permisos para realizar esta acción.");
-            }
+            var doc = await _context.Documents.AsNoTracking().FirstOrDefaultAsync(d => d.Id == id);
+            var result = doc?.StatusId == DocumentWorkflowConstants.Status.Candidate
+                ? await _versionService.AdminFinalizeRejectAsync(id, userId.Value, rejectionComment)
+                : await _versionService.ReviewerRejectAsync(id, userId.Value, rejectionComment);
 
-            var doc = _context.Documents.FirstOrDefault(d => d.Id == id);
+            TempData[result.Success ? "SuccessMessage" : "ErrorMessage"] = result.Message;
 
-            if (doc != null && doc.StatusId == 2 && CheckApprovalPermissions(doc, userId.Value))
-            {
-                doc.StatusId = 4; // Rechazado
+            return RedirectToPage("/Documents/List");
+        }
 
-                string finalComment = string.IsNullOrWhiteSpace(rejectionComment) 
-                    ? "El documento ha sido devuelto al autor para correcciones." 
-                    : rejectionComment;
+        public async Task<IActionResult> OnPostFinalizeApproveAsync(Guid id)
+        {
+            var userId = HttpContext.Session.GetInt32("UserId");
+            if (userId == null) return RedirectToPage("/Login");
 
-                _context.ApprovalHistory.Add(new ApprovalHistory
-                {
-                    DocumentId = doc.Id,
-                    UserId = userId.Value,
-                    Action = "Rechazado",
-                    Comment = finalComment,
-                    ActionDate = DateTime.Now
-                });
-
-                _context.SaveChanges();
-                TempData["SuccessMessage"] = "El documento ha sido rechazado y devuelto al autor.";
-            }
-            else
-            {
-                TempData["ErrorMessage"] = "No tienes permiso para rechazar este documento.";
-            }
+            var result = await _versionService.AdminFinalizeApproveAsync(id, userId.Value);
+            TempData[result.Success ? "SuccessMessage" : "ErrorMessage"] = result.Message;
 
             return RedirectToPage("/Documents/List");
         }
@@ -381,8 +291,7 @@ namespace QualityDoc.Pages.Documents
             if (userId == null) return RedirectToPage("/Login");
 
             var rolName = HttpContext.Session.GetString("Rol") ?? "";
-            if (rolName.Trim().Equals("Operador", StringComparison.OrdinalIgnoreCase) ||
-                rolName.Trim().Equals("Operator", StringComparison.OrdinalIgnoreCase))
+            if (_permissions.IsOperador(rolName))
             {
                 return BadRequest("El rol Operador no tiene permisos para realizar esta acción.");
             }
@@ -391,20 +300,23 @@ namespace QualityDoc.Pages.Documents
             if (documento == null) return RedirectToPage();
 
             var currentUser = await _context.Users.Include(u => u.Rol).FirstOrDefaultAsync(u => u.Id == userId);
-            bool isSuperAdmin = currentUser?.Rol?.Name?.Trim().Equals("SuperAdmin", StringComparison.OrdinalIgnoreCase) == true 
-                             || currentUser?.Rol?.Name?.Trim().Equals("Super Admin", StringComparison.OrdinalIgnoreCase) == true
-                             || currentUser?.Rol?.Name?.Trim().Equals("Súperadmin", StringComparison.OrdinalIgnoreCase) == true;
-            bool isAuthor = documento.AuthorId == userId;
-
-            if (!isSuperAdmin && !isAuthor)
+            if (currentUser == null || !_permissions.CanEditDraft(currentUser, rolName, documento))
             {
                 TempData["ErrorMessage"] = "No tienes permiso para editar este documento.";
                 return RedirectToPage(new { id });
             }
 
+            var department = await _context.Departments
+                .FirstOrDefaultAsync(d => d.Id == EditDepartmentId && d.CompanyId == documento.CompanyId);
+            if (department == null)
+            {
+                TempData["ErrorMessage"] = "El departamento seleccionado no pertenece a la empresa del documento.";
+                return RedirectToPage(new { id });
+            }
+
             documento.Title = EditTitle;
             documento.Description = EditDescription;
-            documento.DepartmentId = EditDepartmentId > 0 ? EditDepartmentId : (int?)null;
+            documento.DepartmentId = department.Id;
 
             string editComment = "Metadatos del documento actualizados.";
 

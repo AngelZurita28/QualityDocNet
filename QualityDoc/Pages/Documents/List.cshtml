@@ -1,14 +1,14 @@
 @page
 @model QualityDoc.Pages.Documents.ListModel
 @{
-    ViewData["Title"] = "Mis Documentos";
+    ViewData["Title"] = Model.PageTitle;
 }
 
 <div class="p-6 max-w-7xl mx-auto space-y-4 text-sm">
 
     <div>
-        <h2 class="text-xl font-semibold">Mis Documentos</h2>
-        <p class="text-gray-500 text-xs">Listado general de documentos</p>
+        <h2 class="text-xl font-semibold">@Model.PageTitle</h2>
+        <p class="text-gray-500 text-xs">@Model.PageDescription</p>
     </div>
 
     @if (TempData["SuccessMessage"] != null)
@@ -43,11 +43,14 @@
             <div class="w-full md:w-48">
                 <label class="block text-xs font-semibold text-gray-600 mb-1">Filtrar por Estado</label>
                 <select asp-for="StatusFilter" class="w-full px-3 py-2 bg-gray-50 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition">
-                    <option value="">Todos los estados</option>
-                    <option value="1">Borrador</option>
-                    <option value="2">En Revisión</option>
-                    <option value="3">Aprobado</option>
-                    <option value="4">Rechazado</option>
+                    @if (Model.StatusOptions.Any(o => o.Id == 1))
+                    {
+                        <option value="">Todos mis documentos</option>
+                    }
+                    @foreach (var option in Model.StatusOptions)
+                    {
+                        <option value="@option.Id">@option.Label</option>
+                    }
                 </select>
             </div>
 
@@ -97,21 +100,31 @@
                                     Vigente
                                 </span>
                             }
-                            else
+                            else if (doc.StatusId == 6)
                             {
                                 <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600">
                                     Histórico
                                 </span>
                             }
+                            else
+                            {
+                                <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700">
+                                    En proceso
+                                </span>
+                            }
                         </td>
-                        <td class="p-3 text-center">v@(doc.VersionNumber)</td>
+                        <td class="p-3 text-center">
+                            @(doc.VersionNumber.HasValue ? $"v{QualityDoc.Services.DocumentVersionService.FormatVersion(doc.VersionNumber)}" : "Sin version")
+                        </td>
                         <td class="p-3 text-center">
                             @{
                                 string badgeClass = doc.StatusId switch {
                                     1 => "bg-gray-100 text-gray-800",
                                     2 => "bg-yellow-100 text-yellow-800",
-                                    3 => "bg-green-100 text-green-800",
+                                    3 => "bg-blue-100 text-blue-800",
                                     4 => "bg-red-100 text-red-800",
+                                    5 => "bg-green-100 text-green-800",
+                                    6 => "bg-slate-100 text-slate-700",
                                     _ => "bg-gray-100 text-gray-800"
                                 };
                                 string statusName = doc.Status?.Name ?? "Borrador";
@@ -124,7 +137,7 @@
                         <td class="p-3 text-gray-600">@(doc.Company?.Name ?? "-")</td>
                         <td class="p-3 text-center text-gray-500">@doc.CreatedAt.ToString("dd/MM/yyyy")</td>
                         <td class="p-3 text-center">
-                            @if (doc.StatusId == 3)
+                            @if (doc.StatusId == 5)
                             {
                                 @if (!doc.SyncFirebase)
                                 {
@@ -148,7 +161,7 @@
                             }
                         </td>
                         <td class="p-3 text-center">
-                            @if (doc.StatusId == 3)
+                            @if (doc.StatusId == 5)
                             {
                                 @if (!doc.SyncPostgre)
                                 {

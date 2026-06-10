@@ -108,7 +108,9 @@
                         </div>
                         <div class="bg-gray-50 p-3 rounded-xl border border-gray-100">
                             <p class="text-[9px] text-gray-400 uppercase font-bold mb-1">Versión</p>
-                            <span class="text-xs font-extrabold text-blue-700 bg-blue-100 px-2 py-0.5 rounded">v@(Model.Documento?.VersionNumber)</span>
+                            <span class="text-xs font-extrabold text-blue-700 bg-blue-100 px-2 py-0.5 rounded">
+                                @(Model.Documento?.VersionNumber.HasValue == true ? $"v{QualityDoc.Services.DocumentVersionService.FormatVersion(Model.Documento.VersionNumber)}" : "Sin version")
+                            </span>
                         </div>
                         <div class="bg-gray-50 p-3 rounded-xl border border-gray-100 col-span-2">
                             <p class="text-[9px] text-gray-400 uppercase font-bold mb-1">Departamento / Área</p>
@@ -178,9 +180,9 @@
                 @if (Model.Documento != null)
                 {
                     <div class="space-y-4">
-                        @if (Model.Documento.StatusId == 1 || Model.Documento.StatusId == 4)
+                        @if (Model.Documento.StatusId == 1)
                         {
-                            if (Model.CurrentUserId == Model.Documento.AuthorId)
+                            if (Model.CanSendReview)
                             {
                                 <form method="post" asp-page-handler="SendReview">
                                     <input type="hidden" name="id" value="@Model.Documento.Id" />
@@ -206,7 +208,7 @@
                                     Documento en Revisión
                                 </div>
                             }
-                            else if (Model.CanApprove)
+                            else if (Model.CanReviewerApprove)
                             {
                                 <div class="grid grid-cols-2 gap-3">
                                     <form method="post" asp-page-handler="Approve">
@@ -230,8 +232,39 @@
                         }
                         else if (Model.Documento.StatusId == 3)
                         {
+                            if (Model.CanAdminFinalize)
+                            {
+                                <div class="space-y-3">
+                                    <div class="p-4 text-center bg-blue-50 text-blue-700 rounded-2xl text-xs font-bold border border-blue-200 flex flex-col gap-1">
+                                        <span class="material-symbols-outlined text-xl">workspace_premium</span>
+                                        Candidata a Nueva Version
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-3">
+                                        <form method="post" asp-page-handler="FinalizeApprove">
+                                            <input type="hidden" name="id" value="@Model.Documento.Id" />
+                                            <button class="w-full bg-green-600 text-white py-4 rounded-2xl hover:bg-green-700 font-bold shadow-lg shadow-green-100 transition text-sm flex items-center justify-center gap-2">
+                                                <span class="material-symbols-outlined">verified</span> Activar
+                                            </button>
+                                        </form>
+                                        <button onclick="document.getElementById('rejectModal').classList.remove('hidden'); document.getElementById('rejectModal').classList.add('flex');"
+                                                class="border-2 border-red-100 text-red-600 py-4 rounded-2xl hover:bg-red-50 font-bold transition text-sm flex items-center justify-center gap-2">
+                                            <span class="material-symbols-outlined">cancel</span> Rechazar
+                                        </button>
+                                    </div>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="p-4 text-center bg-blue-50 text-blue-700 rounded-2xl text-xs font-bold border border-blue-200 flex flex-col gap-1">
+                                    <span class="material-symbols-outlined text-xl">hourglass_empty</span>
+                                    Candidata pendiente de aprobacion final
+                                </div>
+                            }
+                        }
+                        else if (Model.Documento.StatusId == 5)
+                        {
                             <div class="p-4 text-center bg-green-600 text-white rounded-2xl text-sm font-bold shadow-lg shadow-green-100 flex items-center justify-center gap-2 mb-6">
-                                <span class="material-symbols-outlined">verified</span> Documento Aprobado
+                                <span class="material-symbols-outlined">verified</span> Version Activa
                             </div>
                             
                             <div class="space-y-3 pt-4 border-t border-gray-200">
@@ -267,6 +300,20 @@
                                         <span class="material-symbols-outlined">check_circle</span> PostgreSQL Sincronizado
                                     </div>
                                 }
+                            </div>
+                        }
+                        else if (Model.Documento.StatusId == 4)
+                        {
+                            <div class="p-4 text-center bg-red-50 text-red-700 rounded-2xl text-xs font-bold border border-red-200 flex flex-col gap-1">
+                                <span class="material-symbols-outlined text-xl">block</span>
+                                Documento Rechazado
+                            </div>
+                        }
+                        else if (Model.Documento.StatusId == 6)
+                        {
+                            <div class="p-4 text-center bg-slate-100 text-slate-700 rounded-2xl text-xs font-bold border border-slate-200 flex flex-col gap-1">
+                                <span class="material-symbols-outlined text-xl">history</span>
+                                Version Obsoleta
                             </div>
                         }
 
@@ -309,11 +356,11 @@
                 @foreach (var v in Model.VersionesAnteriores)
                 {
                     <tr class="hover:bg-gray-50 transition">
-                        <td class="px-6 py-3 font-medium text-gray-800">v@(v.VersionNumber)</td>
+                        <td class="px-6 py-3 font-medium text-gray-800">v@(QualityDoc.Services.DocumentVersionService.FormatVersion(v.VersionNumber))</td>
                         <td class="px-6 py-3 text-gray-500">@v.CreatedAt.ToString("dd MMM yyyy, HH:mm")</td>
                         <td class="px-6 py-3">
-                            <span class="px-2 py-1 rounded text-[10px] uppercase tracking-wider font-bold @(v.StatusId == 2 ? "bg-green-100 text-green-700" : v.StatusId == 4 ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-600")">
-                                @(v.StatusId == 2 ? "Aprobado" : v.StatusId == 4 ? "Rechazado" : "Borrador")
+                            <span class="px-2 py-1 rounded text-[10px] uppercase tracking-wider font-bold @(v.StatusId == 5 ? "bg-green-100 text-green-700" : v.StatusId == 6 ? "bg-slate-100 text-slate-700" : "bg-gray-100 text-gray-600")">
+                                @(v.Status?.Name ?? "Version")
                             </span>
                         </td>
                         <td class="px-6 py-3 text-right">

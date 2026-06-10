@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using QualityDoc.Data;
+using QualityDoc.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Google;
 
@@ -15,6 +16,8 @@ builder.Services.AddRazorPages();
 builder.Services.AddControllers();
 builder.Services.AddSession();
 builder.Services.AddHttpClient();
+builder.Services.AddScoped<RolePermissionService>();
+builder.Services.AddScoped<DocumentVersionService>();
 
 // Configuración de Autenticación para Google SSO
 builder.Services.AddAuthentication(options =>

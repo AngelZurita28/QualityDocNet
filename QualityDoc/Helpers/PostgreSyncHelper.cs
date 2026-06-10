@@ -40,13 +40,13 @@ namespace QualityDoc.Helpers
             using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("id", documento.Id);
             cmd.Parameters.AddWithValue("code", documento.DocumentCode ?? (object)DBNull.Value);
-            cmd.Parameters.AddWithValue("version", documento.VersionNumber);
+            cmd.Parameters.AddWithValue("version", documento.VersionNumber.HasValue ? (object)documento.VersionNumber.Value : DBNull.Value);
             cmd.Parameters.AddWithValue("latest", documento.IsLatest);
             cmd.Parameters.AddWithValue("title", documento.Title);
             cmd.Parameters.AddWithValue("description", documento.Description ?? (object)DBNull.Value);
             cmd.Parameters.AddWithValue("file", documento.FilePath ?? (object)DBNull.Value);
             cmd.Parameters.AddWithValue("company", documento.Company?.Name ?? "N/A");
-            cmd.Parameters.AddWithValue("status", documento.Status?.Name ?? "Aprobado");
+            cmd.Parameters.AddWithValue("status", documento.Status?.Name ?? "Activo");
 
             int rowsAffected = await cmd.ExecuteNonQueryAsync();
             return rowsAffected > 0;

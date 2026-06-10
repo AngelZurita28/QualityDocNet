@@ -70,6 +70,15 @@ namespace QualityDoc.Pages
                 return Page();
             }
 
+            var selectedDepartment = await _context.Departments
+                .FirstOrDefaultAsync(d => d.Id == DepartmentId && d.CompanyId == CompanyId);
+            if (selectedDepartment == null)
+            {
+                ModelState.AddModelError("DepartmentId", "El departamento seleccionado no pertenece a la empresa indicada.");
+                await LoadData();
+                return Page();
+            }
+
             Email = Email?.Trim().ToLower() ?? string.Empty;
             FullName = FullName?.Trim() ?? string.Empty;
 
@@ -104,8 +113,7 @@ namespace QualityDoc.Pages
             var company = await _context.Companies.FindAsync(CompanyId);
             var companyName = company?.Name ?? "Sin Empresa";
 
-            var dept = await _context.Departments.FindAsync(DepartmentId);
-            var deptName = dept?.Name ?? "Sin Área";
+            var deptName = selectedDepartment.Name;
 
             HttpContext.Session.SetInt32("UserId", usuario.Id);
             HttpContext.Session.SetString("Usuario", usuario.FullName);
@@ -124,7 +132,16 @@ namespace QualityDoc.Pages
             var roles = await _context.Roles.ToListAsync();
             Roles = new SelectList(roles, "Id", "Name");
 
-            var depts = await _context.Departments.ToListAsync();
+            var depts = await _context.Departments
+                .Include(d => d.Company)
+                .OrderBy(d => d.Company.Name)
+                .ThenBy(d => d.Name)
+                .Select(d => new
+                {
+                    d.Id,
+                    Name = d.Company.Name + " - " + d.Name
+                })
+                .ToListAsync();
             Departamentos = new SelectList(depts, "Id", "Name");
         }
     }

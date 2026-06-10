@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using QualityDoc.Data;
 using QualityDoc.Pages.Models;
 using QualityDoc.Helpers;
+using QualityDoc.Services;
 
 namespace QualityDoc.Pages
 {
@@ -12,12 +13,16 @@ namespace QualityDoc.Pages
         private readonly AppDbContext _context;
         private readonly IWebHostEnvironment _env;
         private readonly IHttpClientFactory _httpClientFactory;
+        private readonly RolePermissionService _permissions;
 
         public int CountTotal { get; set; }
         public int CountBorrador { get; set; }
         public int CountRevision { get; set; }
-        public int CountAprobado { get; set; }
+        public int CountCandidata { get; set; }
         public int CountRechazado { get; set; }
+        public int CountActivo { get; set; }
+        public int CountObsoleto { get; set; }
+        public bool CanCreateDraft { get; set; }
 
         public List<DepartmentStat> DeptStats { get; set; } = new();
         public List<Department> DepartmentsList { get; set; } = new();
@@ -28,15 +33,18 @@ namespace QualityDoc.Pages
             public int Count { get; set; }
             public int Borrador { get; set; }
             public int Revision { get; set; }
-            public int Aprobado { get; set; }
+            public int Candidata { get; set; }
             public int Rechazado { get; set; }
+            public int Activo { get; set; }
+            public int Obsoleto { get; set; }
         }
 
-        public IndexModel(AppDbContext context, IWebHostEnvironment env, IHttpClientFactory httpClientFactory)
+        public IndexModel(AppDbContext context, IWebHostEnvironment env, IHttpClientFactory httpClientFactory, RolePermissionService permissions)
         {
             _context = context;
             _env = env;
             _httpClientFactory = httpClientFactory;
+            _permissions = permissions;
         }
 
         [BindProperty]
@@ -68,27 +76,20 @@ namespace QualityDoc.Pages
             if (usuario == null) return RedirectToPage("/Login");
 
             var rolName = HttpContext.Session.GetString("Rol") ?? "";
-            bool isSuperAdmin = rolName.Trim().Equals("SuperAdmin", StringComparison.OrdinalIgnoreCase) || 
-                                rolName.Trim().Equals("Super Admin", StringComparison.OrdinalIgnoreCase) ||
-                                rolName.Trim().Equals("Súperadmin", StringComparison.OrdinalIgnoreCase);
-            bool isRedacter = rolName.Trim().Equals("Redacter", StringComparison.OrdinalIgnoreCase) ||
-                              rolName.Trim().Equals("Redactor", StringComparison.OrdinalIgnoreCase);
-            bool isOperador = rolName.Trim().Equals("Operador", StringComparison.OrdinalIgnoreCase) ||
-                              rolName.Trim().Equals("Operator", StringComparison.OrdinalIgnoreCase);
+            CanCreateDraft = _permissions.CanCreateDraft(rolName);
 
+            IQueryable<Documento> query = _context.Documents;
 
-            IQueryable<Documento> query = _context.Documents.Where(d => d.IsLatest);
-
-            if (isSuperAdmin)
+            if (_permissions.IsSuperAdmin(rolName))
             {
                 // Súperadmin ve los de cualquier empresa
             }
-            else if (isRedacter)
+            else if (_permissions.IsRedacter(rolName))
             {
                 // Redacter solo ve sus propios documentos
                 query = query.Where(d => d.AuthorId == userId.Value);
             }
-            else if (isOperador)
+            else if (_permissions.IsOperador(rolName))
             {
                 // Operador no puede ver nada
                 query = query.Where(d => false);
@@ -100,22 +101,28 @@ namespace QualityDoc.Pages
             }
 
             CountTotal = await query.CountAsync();
-            CountBorrador = await query.CountAsync(d => d.StatusId == 1);
-            CountRevision = await query.CountAsync(d => d.StatusId == 2);
-            CountAprobado = await query.CountAsync(d => d.StatusId == 3);
-            CountRechazado = await query.CountAsync(d => d.StatusId == 4);
+            CountBorrador = await query.CountAsync(d => d.StatusId == DocumentWorkflowConstants.Status.Draft);
+            CountRevision = await query.CountAsync(d => d.StatusId == DocumentWorkflowConstants.Status.InReview);
+            CountCandidata = await query.CountAsync(d => d.StatusId == DocumentWorkflowConstants.Status.Candidate);
+            CountRechazado = await query.CountAsync(d => d.StatusId == DocumentWorkflowConstants.Status.Rejected);
+            CountActivo = await query.CountAsync(d => d.StatusId == DocumentWorkflowConstants.Status.Active);
+            CountObsoleto = await query.CountAsync(d => d.StatusId == DocumentWorkflowConstants.Status.Obsolete);
 
-            DepartmentsList = await _context.Departments.ToListAsync();
+            DepartmentsList = _permissions.IsSuperAdmin(rolName)
+                ? await _context.Departments.ToListAsync()
+                : await _context.Departments.Where(d => d.CompanyId == usuario.CompanyId).ToListAsync();
 
             var docs = await query.Include(d => d.Department).ToListAsync();
             DeptStats = DepartmentsList.Select(dept => new DepartmentStat
             {
                 Name = dept.Name,
                 Count = docs.Count(d => d.DepartmentId == dept.Id),
-                Borrador = docs.Count(d => d.DepartmentId == dept.Id && d.StatusId == 1),
-                Revision = docs.Count(d => d.DepartmentId == dept.Id && d.StatusId == 2),
-                Aprobado = docs.Count(d => d.DepartmentId == dept.Id && d.StatusId == 3),
-                Rechazado = docs.Count(d => d.DepartmentId == dept.Id && d.StatusId == 4)
+                Borrador = docs.Count(d => d.DepartmentId == dept.Id && d.StatusId == DocumentWorkflowConstants.Status.Draft),
+                Revision = docs.Count(d => d.DepartmentId == dept.Id && d.StatusId == DocumentWorkflowConstants.Status.InReview),
+                Candidata = docs.Count(d => d.DepartmentId == dept.Id && d.StatusId == DocumentWorkflowConstants.Status.Candidate),
+                Rechazado = docs.Count(d => d.DepartmentId == dept.Id && d.StatusId == DocumentWorkflowConstants.Status.Rejected),
+                Activo = docs.Count(d => d.DepartmentId == dept.Id && d.StatusId == DocumentWorkflowConstants.Status.Active),
+                Obsoleto = docs.Count(d => d.DepartmentId == dept.Id && d.StatusId == DocumentWorkflowConstants.Status.Obsolete)
             }).ToList();
 
             return Page();
@@ -127,15 +134,21 @@ namespace QualityDoc.Pages
             if (userId == null) return Unauthorized();
 
             var rolName = HttpContext.Session.GetString("Rol") ?? "";
-            if (rolName.Trim().Equals("Operador", StringComparison.OrdinalIgnoreCase) ||
-                rolName.Trim().Equals("Operator", StringComparison.OrdinalIgnoreCase))
+            if (!_permissions.CanCreateDraft(rolName))
             {
-                return BadRequest("El rol Operador no tiene permisos para crear documentos.");
+                return BadRequest("Tu rol no tiene permisos para crear borradores.");
             }
 
             var usuario = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
             if (usuario == null || usuario.CompanyId == null) 
                 return BadRequest("Usuario sin empresa asignada.");
+
+            var department = await _context.Departments
+                .FirstOrDefaultAsync(d => d.Id == SelectedDepartmentId && d.CompanyId == usuario.CompanyId);
+            if (department == null)
+            {
+                return BadRequest("El departamento seleccionado no pertenece a tu empresa.");
+            }
 
             string filePath = "";
             if (UploadFile != null)
@@ -154,31 +167,25 @@ namespace QualityDoc.Pages
             }
 
             string documentCode;
-            int version = 1;
+            decimal? version = null;
             Guid? parentId = null;
 
             if (EsNuevaVersion && !string.IsNullOrEmpty(CodigoExistente))
             {
                 var docBase = await _context.Documents
-                    .Where(d => d.DocumentCode == CodigoExistente)
+                    .Where(d => d.DocumentCode == CodigoExistente && d.CompanyId == usuario.CompanyId)
                     .OrderByDescending(d => d.VersionNumber)
                     .FirstOrDefaultAsync();
 
                 if (docBase == null) return BadRequest("Documento base no encontrado.");
 
-                parentId = docBase.Id;
+                var activeBase = await _context.Documents
+                    .Where(d => d.DocumentCode == CodigoExistente && d.CompanyId == usuario.CompanyId && d.IsLatest)
+                    .OrderByDescending(d => d.VersionNumber)
+                    .FirstOrDefaultAsync();
 
-                bool existeVersionSiguiente = await _context.Documents.AnyAsync(d => d.ParentId == parentId);
-                if (existeVersionSiguiente)
-                {
-                    return BadRequest("Ya existe una nueva versión en progreso o aprobada derivada de este documento base.");
-                }
-
+                parentId = activeBase?.Id ?? docBase.Id;
                 documentCode = docBase.DocumentCode!;
-                version = docBase.VersionNumber + 1;
-
-                var anteriores = _context.Documents.Where(d => d.DocumentCode == documentCode);
-                foreach (var d in anteriores) d.IsLatest = false;
             }
             else
             {
@@ -193,12 +200,12 @@ namespace QualityDoc.Pages
                 Description = Description,
                 FilePath = filePath,
                 VersionNumber = version,
-                IsLatest = true,
+                IsLatest = false,
                 ParentId = parentId,
                 AuthorId = usuario.Id,
                 CompanyId = (int)usuario.CompanyId,
                 DepartmentId = SelectedDepartmentId,
-                StatusId = 1,
+                StatusId = DocumentWorkflowConstants.Status.Draft,
                 CreatedAt = DateTime.Now
             };
 

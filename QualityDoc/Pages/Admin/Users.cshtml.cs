@@ -48,6 +48,16 @@ namespace QualityDoc.Pages.Admin
 
             PageNumber = pageNumber;
             var query = _context.Users.AsQueryable();
+            var currentUserId = HttpContext.Session.GetInt32("UserId");
+            var currentUser = currentUserId == null
+                ? null
+                : await _context.Users.FirstOrDefaultAsync(u => u.Id == currentUserId.Value);
+            if (currentUser == null) return RedirectToPage("/Login");
+
+            if (!isSuperAdmin)
+            {
+                query = query.Where(u => u.CompanyId == currentUser.CompanyId);
+            }
 
             int totalRecords = await query.CountAsync();
             TotalPages = (int)Math.Ceiling(totalRecords / (double)PageSize);
@@ -61,7 +71,10 @@ namespace QualityDoc.Pages.Admin
                 .ToListAsync();
 
             RolesList = new SelectList(await _context.Roles.ToListAsync(), "Id", "Name");
-            CompaniesList = new SelectList(await _context.Companies.ToListAsync(), "Id", "Name");
+            var companies = isSuperAdmin
+                ? await _context.Companies.ToListAsync()
+                : await _context.Companies.Where(c => c.Id == currentUser.CompanyId).ToListAsync();
+            CompaniesList = new SelectList(companies, "Id", "Name");
 
             return Page();
         }
@@ -77,11 +90,34 @@ namespace QualityDoc.Pages.Admin
 
             if (!isSuperAdmin && !isAdmin) return Unauthorized();
 
+            var currentUserId = HttpContext.Session.GetInt32("UserId");
+            var currentUser = currentUserId == null
+                ? null
+                : await _context.Users.FirstOrDefaultAsync(u => u.Id == currentUserId.Value);
+
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
             if (user != null)
             {
+                if (!isSuperAdmin)
+                {
+                    if (currentUser == null || user.CompanyId != currentUser.CompanyId || companyId != currentUser.CompanyId)
+                    {
+                        return Unauthorized();
+                    }
+                }
+
                 user.RoleId = roleId;
                 user.CompanyId = companyId;
+                var departmentStillMatches = user.DepartmentId != null &&
+                    await _context.Departments.AnyAsync(d => d.Id == user.DepartmentId && d.CompanyId == companyId);
+                if (!departmentStillMatches)
+                {
+                    user.DepartmentId = await _context.Departments
+                        .Where(d => d.CompanyId == companyId)
+                        .OrderBy(d => d.Name)
+                        .Select(d => (int?)d.Id)
+                        .FirstOrDefaultAsync();
+                }
                 user.IsActive = isActive;
                 await _context.SaveChangesAsync();
             }
