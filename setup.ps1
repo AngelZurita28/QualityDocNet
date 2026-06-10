@@ -86,7 +86,7 @@ while ($attempt -le $maxAttempts -and -not $isConnected) {
         }
 
         # Importar el script de base de datos
-        $scriptPath = "./QualityDoc/Database/script_utf8.sql"
+        $scriptPath = "./QualityDoc/Database/script.sql"
         if (Test-Path -Path $scriptPath) {
             Write-Host "Importando script inicial de la base de datos..."
             docker cp $scriptPath mssql_db:/tmp/script.sql
