@@ -217,7 +217,7 @@ GO
 ALTER TABLE [dbo].[Users] CHECK CONSTRAINT [FK_Users_Departments]
 GO
 
--- 4. Insertar datos por defecto
+-- 4. Insertar datos por defecto (Solo Roles)
 SET IDENTITY_INSERT [dbo].[Roles] ON;
 INSERT INTO [dbo].[Roles] ([Id], [Name]) VALUES (1, 'Super Admin');
 INSERT INTO [dbo].[Roles] ([Id], [Name]) VALUES (2, 'Admin');
@@ -225,64 +225,6 @@ INSERT INTO [dbo].[Roles] ([Id], [Name]) VALUES (3, 'Reviewer');
 INSERT INTO [dbo].[Roles] ([Id], [Name]) VALUES (4, 'Redacter');
 INSERT INTO [dbo].[Roles] ([Id], [Name]) VALUES (5, 'Operador');
 SET IDENTITY_INSERT [dbo].[Roles] OFF;
-GO
-
-SET IDENTITY_INSERT [dbo].[Companies] ON;
-INSERT INTO [dbo].[Companies] ([Id], [Name], [IsActive]) VALUES (1, 'Empresa 1', 1);
-INSERT INTO [dbo].[Companies] ([Id], [Name], [IsActive]) VALUES (2, 'Empresa 2', 1);
-SET IDENTITY_INSERT [dbo].[Companies] OFF;
-GO
-
-SET IDENTITY_INSERT [dbo].[Departments] ON;
-INSERT INTO [dbo].[Departments] ([Id], [Name]) VALUES (1, 'E1 - Departamento A');
-INSERT INTO [dbo].[Departments] ([Id], [Name]) VALUES (2, 'E1 - Departamento B');
-INSERT INTO [dbo].[Departments] ([Id], [Name]) VALUES (3, 'E2 - Departamento C');
-INSERT INTO [dbo].[Departments] ([Id], [Name]) VALUES (4, 'E2 - Departamento D');
-SET IDENTITY_INSERT [dbo].[Departments] OFF;
-GO
-
-SET IDENTITY_INSERT [dbo].[DocumentStatus] ON;
-INSERT INTO [dbo].[DocumentStatus] ([Id], [Name]) VALUES (1, 'Borrador');
-INSERT INTO [dbo].[DocumentStatus] ([Id], [Name]) VALUES (2, 'En Revision');
-INSERT INTO [dbo].[DocumentStatus] ([Id], [Name]) VALUES (3, 'Aprobado');
-INSERT INTO [dbo].[DocumentStatus] ([Id], [Name]) VALUES (4, 'Rechazado');
-SET IDENTITY_INSERT [dbo].[DocumentStatus] OFF;
-GO
-
-SET IDENTITY_INSERT [dbo].[Users] ON;
--- Super Admin (superadmin123)
-INSERT INTO [dbo].[Users] ([Id], [FullName], [Email], [PasswordHash], [RoleId], [CompanyId], [DepartmentId], [IsActive]) 
-VALUES (1, 'Super Admin', 'superadmin@superadmin', '/4wGVGB29KwdeemhsabpfehHVSjN7ZUOI4VxngXBm9k=', 1, NULL, NULL, 1);
-
--- Empresa 1
--- Admin (adminE1)
-INSERT INTO [dbo].[Users] ([Id], [FullName], [Email], [PasswordHash], [RoleId], [CompanyId], [DepartmentId], [IsActive]) 
-VALUES (2, 'Admin Empresa 1', 'admin@empresa1.com', 'Bslib7DXnu9HW2HhCj3zK05PEMYjFbi2uBcewT93BSU=', 2, 1, 1, 1);
--- Reviewer (reviewerE1)
-INSERT INTO [dbo].[Users] ([Id], [FullName], [Email], [PasswordHash], [RoleId], [CompanyId], [DepartmentId], [IsActive]) 
-VALUES (3, 'Reviewer Empresa 1', 'reviewer@empresa1.com', 'IF1GvrY2tjpwtlTpOZE0/4cECk1b9FVAJehompSCbQs=', 3, 1, 1, 1);
--- Redacter (redacterE1)
-INSERT INTO [dbo].[Users] ([Id], [FullName], [Email], [PasswordHash], [RoleId], [CompanyId], [DepartmentId], [IsActive]) 
-VALUES (4, 'Redacter Empresa 1', 'redacter@empresa1.com', 'MxgaZa9NvAYUrqHflDF3vhuVxYELfWymQpsPd/11Kok=', 4, 1, 2, 1);
--- Operador (operadorE1)
-INSERT INTO [dbo].[Users] ([Id], [FullName], [Email], [PasswordHash], [RoleId], [CompanyId], [DepartmentId], [IsActive]) 
-VALUES (5, 'Operador Empresa 1', 'operador@empresa1.com', 'Nl1LLlZ4IdWHtSQRmpTNdj11sahLyXkJbQ3R0BMHR50=', 5, 1, 2, 1);
-
--- Empresa 2
--- Admin (adminE2)
-INSERT INTO [dbo].[Users] ([Id], [FullName], [Email], [PasswordHash], [RoleId], [CompanyId], [DepartmentId], [IsActive]) 
-VALUES (6, 'Admin Empresa 2', 'admin@empresa2.com', 'GNCYVJdpgcejfFXLlzMPQEtmkENVz77mVQniJ8S5C+g=', 2, 2, 3, 1);
--- Reviewer (reviewerE2)
-INSERT INTO [dbo].[Users] ([Id], [FullName], [Email], [PasswordHash], [RoleId], [CompanyId], [DepartmentId], [IsActive]) 
-VALUES (7, 'Reviewer Empresa 2', 'reviewer@empresa2.com', '4nhY9Zfr+18CoTCFPtWA5TAICND7IOwrNGT/Z+MV/2A=', 3, 2, 3, 1);
--- Redacter (redacterE2)
-INSERT INTO [dbo].[Users] ([Id], [FullName], [Email], [PasswordHash], [RoleId], [CompanyId], [DepartmentId], [IsActive]) 
-VALUES (8, 'Redacter Empresa 2', 'redacter@empresa2.com', 'g0pVqb6UFj61MbED8fgFNwRhCxsV+8f2fGxro+uF5LA=', 4, 2, 4, 1);
--- Operador (operadorE2)
-INSERT INTO [dbo].[Users] ([Id], [FullName], [Email], [PasswordHash], [RoleId], [CompanyId], [DepartmentId], [IsActive]) 
-VALUES (9, 'Operador Empresa 2', 'operador@empresa2.com', 'g/Yp8xf2TUxrHdmAZ61KqTkWVcqxRMwnEv2R20wxbBU=', 5, 2, 4, 1);
-
-SET IDENTITY_INSERT [dbo].[Users] OFF;
 GO
 
 USE [master]
