@@ -8,6 +8,25 @@ namespace QualityDoc.Helpers
 {
     public static class PostgreSyncHelper
     {
+        public static object GenerateApiPayload(Documento documento)
+        {
+            return new
+            {
+                Id = documento.Id.ToString(),
+                DocumentCode = documento.DocumentCode,
+                Title = documento.Title,
+                Description = documento.Description,
+                FilePath = documento.FilePath,
+                VersionNumber = documento.VersionNumber.HasValue ? (int)documento.VersionNumber.Value : 1,
+                IsLatest = documento.IsLatest,
+                StatusName = documento.Status?.Name ?? "Activo",
+                CompanyId = documento.CompanyId,
+                CompanyName = documento.Company?.Name,
+                AuthorId = documento.AuthorId,
+                CreatedAt = documento.CreatedAt.ToString("o")
+            };
+        }
+
         public static async Task<bool> SyncToPostgreAsync(Documento documento, string connectionString)
         {
             using var conn = new NpgsqlConnection(connectionString);

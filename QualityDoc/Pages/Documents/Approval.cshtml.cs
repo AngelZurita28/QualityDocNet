@@ -264,8 +264,7 @@ namespace QualityDoc.Pages.Documents
             if (userId == null) return RedirectToPage("/Login");
 
             var rolName = HttpContext.Session.GetString("Rol") ?? "";
-            if (rolName.Trim().Equals("Operador", StringComparison.OrdinalIgnoreCase) ||
-                rolName.Trim().Equals("Operator", StringComparison.OrdinalIgnoreCase))
+            if (_permissions.IsOperador(rolName))
             {
                 return BadRequest("El rol Operador no tiene permisos para realizar esta acción.");
             }
@@ -277,17 +276,34 @@ namespace QualityDoc.Pages.Documents
 
             if (documento == null) return RedirectToPage();
 
-            var connString = _configuration.GetConnectionString("PostgresConnection");
-            if (string.IsNullOrEmpty(connString))
+            var usuario = await _context.Users.Include(u => u.Rol).FirstOrDefaultAsync(u => u.Id == userId.Value);
+            if (usuario == null || !_permissions.CanViewDocument(usuario, rolName, documento) || documento.StatusId != DocumentWorkflowConstants.Status.Active)
             {
-                TempData["ErrorMessage"] = "Cadena de conexión a PostgreSQL no configurada.";
+                return BadRequest("No tienes permiso para sincronizar este documento.");
+            }
+
+            if (string.IsNullOrWhiteSpace(documento.DocumentCode))
+            {
+                TempData["ErrorMessage"] = "No se puede sincronizar con PostgreSQL: el documento no tiene codigo.";
                 return RedirectToPage(new { id = id });
             }
 
+            if (documento.SyncPostgre)
+            {
+                TempData["SuccessMessage"] = "Este documento ya estaba sincronizado con PostgreSQL.";
+                return RedirectToPage(new { id = id });
+            }
+
+            var postgreEndpoint = _configuration["PostgreSync:Endpoint"] ?? "http://localhost/qualitydoc/index.php?action=upload";
+            var payload = PostgreSyncHelper.GenerateApiPayload(documento);
+
             try
             {
-                bool success = await PostgreSyncHelper.SyncToPostgreAsync(documento, connString);
-                if (success)
+                using var client = new HttpClient();
+                var response = await client.PostAsJsonAsync(postgreEndpoint, payload);
+                var responseBody = await response.Content.ReadAsStringAsync();
+
+                if (response.IsSuccessStatusCode)
                 {
                     documento.SyncPostgre = true;
                     documento.LastErrorLog = null;
@@ -295,12 +311,13 @@ namespace QualityDoc.Pages.Documents
                 }
                 else
                 {
-                    TempData["ErrorMessage"] = "No se pudieron realizar cambios en PostgreSQL.";
+                    documento.LastErrorLog = responseBody;
+                    TempData["ErrorMessage"] = "Error al sincronizar con PostgreSQL: " + response.StatusCode;
                 }
             }
             catch (Exception ex)
             {
-                documento.LastErrorLog = "Error Postgres: " + ex.Message;
+                documento.LastErrorLog = "Error PostgreSQL: " + ex.Message;
                 TempData["ErrorMessage"] = "Fallo al sincronizar con PostgreSQL: " + ex.Message;
             }
 

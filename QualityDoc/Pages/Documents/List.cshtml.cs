@@ -326,17 +326,28 @@ namespace QualityDoc.Pages.Documents
                 return BadRequest("No tienes permiso para sincronizar este documento.");
             }
 
-            var connString = _configuration.GetConnectionString("PostgresConnection");
-            if (string.IsNullOrEmpty(connString))
+            if (string.IsNullOrWhiteSpace(documento.DocumentCode))
             {
-                TempData["ErrorMessage"] = "Cadena de conexión a PostgreSQL no configurada.";
+                TempData["ErrorMessage"] = "No se puede sincronizar con PostgreSQL: el documento no tiene codigo.";
                 return RedirectToPage(new { pageNumber = PageNumber });
             }
 
+            if (documento.SyncPostgre)
+            {
+                TempData["SuccessMessage"] = "Este documento ya estaba sincronizado con PostgreSQL.";
+                return RedirectToPage(new { pageNumber = PageNumber });
+            }
+
+            var postgreEndpoint = _configuration["PostgreSync:Endpoint"] ?? "http://localhost/qualitydoc/index.php?action=upload";
+            var payload = PostgreSyncHelper.GenerateApiPayload(documento);
+
             try
             {
-                bool success = await PostgreSyncHelper.SyncToPostgreAsync(documento, connString);
-                if (success)
+                var client = _httpClientFactory.CreateClient();
+                var response = await client.PostAsJsonAsync(postgreEndpoint, payload);
+                var responseBody = await response.Content.ReadAsStringAsync();
+
+                if (response.IsSuccessStatusCode)
                 {
                     documento.SyncPostgre = true;
                     documento.LastErrorLog = null;
@@ -344,12 +355,13 @@ namespace QualityDoc.Pages.Documents
                 }
                 else
                 {
-                    TempData["ErrorMessage"] = "No se pudieron realizar cambios en PostgreSQL.";
+                    documento.LastErrorLog = responseBody;
+                    TempData["ErrorMessage"] = "Error al sincronizar con PostgreSQL: " + response.StatusCode;
                 }
             }
             catch (Exception ex)
             {
-                documento.LastErrorLog = "Error Postgres: " + ex.Message;
+                documento.LastErrorLog = "Error PostgreSQL: " + ex.Message;
                 TempData["ErrorMessage"] = "Fallo al sincronizar con PostgreSQL: " + ex.Message;
             }
 
