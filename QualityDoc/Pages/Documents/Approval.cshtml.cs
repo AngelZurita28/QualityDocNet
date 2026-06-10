@@ -71,6 +71,13 @@ namespace QualityDoc.Pages.Documents
             var userId = HttpContext.Session.GetInt32("UserId");
             if (userId == null) return RedirectToPage("/Login");
 
+            var rolName = HttpContext.Session.GetString("Rol") ?? "";
+            if (rolName.Trim().Equals("Operador", StringComparison.OrdinalIgnoreCase) ||
+                rolName.Trim().Equals("Operator", StringComparison.OrdinalIgnoreCase))
+            {
+                return RedirectToPage("/Index");
+            }
+
             CurrentUserId = userId.Value;
 
             if (id != null)
@@ -128,6 +135,13 @@ namespace QualityDoc.Pages.Documents
             var userId = HttpContext.Session.GetInt32("UserId");
             if (userId == null) return RedirectToPage("/Login");
 
+            var rolName = HttpContext.Session.GetString("Rol") ?? "";
+            if (rolName.Trim().Equals("Operador", StringComparison.OrdinalIgnoreCase) ||
+                rolName.Trim().Equals("Operator", StringComparison.OrdinalIgnoreCase))
+            {
+                return BadRequest("El rol Operador no tiene permisos para realizar esta acción.");
+            }
+
             var doc = _context.Documents.FirstOrDefault(d => d.Id == id);
             if (doc != null && doc.AuthorId == userId.Value && (doc.StatusId == 1 || doc.StatusId == 4))
             {
@@ -157,6 +171,13 @@ namespace QualityDoc.Pages.Documents
         {
             var userId = HttpContext.Session.GetInt32("UserId");
             if (userId == null) return RedirectToPage("/Login");
+
+            var rolName = HttpContext.Session.GetString("Rol") ?? "";
+            if (rolName.Trim().Equals("Operador", StringComparison.OrdinalIgnoreCase) ||
+                rolName.Trim().Equals("Operator", StringComparison.OrdinalIgnoreCase))
+            {
+                return BadRequest("El rol Operador no tiene permisos para realizar esta acción.");
+            }
 
             var doc = _context.Documents.FirstOrDefault(d => d.Id == id);
 
@@ -188,6 +209,13 @@ namespace QualityDoc.Pages.Documents
         {
             var userId = HttpContext.Session.GetInt32("UserId");
             if (userId == null) return RedirectToPage("/Login");
+
+            var rolName = HttpContext.Session.GetString("Rol") ?? "";
+            if (rolName.Trim().Equals("Operador", StringComparison.OrdinalIgnoreCase) ||
+                rolName.Trim().Equals("Operator", StringComparison.OrdinalIgnoreCase))
+            {
+                return BadRequest("El rol Operador no tiene permisos para realizar esta acción.");
+            }
 
             var doc = _context.Documents.FirstOrDefault(d => d.Id == id);
 
@@ -221,6 +249,16 @@ namespace QualityDoc.Pages.Documents
 
         public async Task<IActionResult> OnPostSyncFirebaseAsync(Guid id)
         {
+            var userId = HttpContext.Session.GetInt32("UserId");
+            if (userId == null) return RedirectToPage("/Login");
+
+            var rolName = HttpContext.Session.GetString("Rol") ?? "";
+            if (rolName.Trim().Equals("Operador", StringComparison.OrdinalIgnoreCase) ||
+                rolName.Trim().Equals("Operator", StringComparison.OrdinalIgnoreCase))
+            {
+                return BadRequest("El rol Operador no tiene permisos para realizar esta acción.");
+            }
+
             var documento = _context.Documents.FirstOrDefault(d => d.Id == id);
             if (documento == null) return RedirectToPage();
 
@@ -292,6 +330,13 @@ namespace QualityDoc.Pages.Documents
             var userId = HttpContext.Session.GetInt32("UserId");
             if (userId == null) return RedirectToPage("/Login");
 
+            var rolName = HttpContext.Session.GetString("Rol") ?? "";
+            if (rolName.Trim().Equals("Operador", StringComparison.OrdinalIgnoreCase) ||
+                rolName.Trim().Equals("Operator", StringComparison.OrdinalIgnoreCase))
+            {
+                return BadRequest("El rol Operador no tiene permisos para realizar esta acción.");
+            }
+
             var documento = _context.Documents
                 .Include(d => d.Company)
                 .Include(d => d.Status)
@@ -334,6 +379,13 @@ namespace QualityDoc.Pages.Documents
         {
             var userId = HttpContext.Session.GetInt32("UserId");
             if (userId == null) return RedirectToPage("/Login");
+
+            var rolName = HttpContext.Session.GetString("Rol") ?? "";
+            if (rolName.Trim().Equals("Operador", StringComparison.OrdinalIgnoreCase) ||
+                rolName.Trim().Equals("Operator", StringComparison.OrdinalIgnoreCase))
+            {
+                return BadRequest("El rol Operador no tiene permisos para realizar esta acción.");
+            }
 
             var documento = await _context.Documents.FirstOrDefaultAsync(d => d.Id == id);
             if (documento == null) return RedirectToPage();

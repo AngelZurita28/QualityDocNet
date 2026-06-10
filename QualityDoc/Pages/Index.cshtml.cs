@@ -71,7 +71,10 @@ namespace QualityDoc.Pages
             bool isSuperAdmin = rolName.Trim().Equals("SuperAdmin", StringComparison.OrdinalIgnoreCase) || 
                                 rolName.Trim().Equals("Super Admin", StringComparison.OrdinalIgnoreCase) ||
                                 rolName.Trim().Equals("Súperadmin", StringComparison.OrdinalIgnoreCase);
-            bool isOperador = rolName.Trim().Equals("Operador", StringComparison.OrdinalIgnoreCase);
+            bool isRedacter = rolName.Trim().Equals("Redacter", StringComparison.OrdinalIgnoreCase) ||
+                              rolName.Trim().Equals("Redactor", StringComparison.OrdinalIgnoreCase);
+            bool isOperador = rolName.Trim().Equals("Operador", StringComparison.OrdinalIgnoreCase) ||
+                              rolName.Trim().Equals("Operator", StringComparison.OrdinalIgnoreCase);
 
 
             IQueryable<Documento> query = _context.Documents.Where(d => d.IsLatest);
@@ -80,10 +83,15 @@ namespace QualityDoc.Pages
             {
                 // Súperadmin ve los de cualquier empresa
             }
+            else if (isRedacter)
+            {
+                // Redacter solo ve sus propios documentos
+                query = query.Where(d => d.AuthorId == userId.Value);
+            }
             else if (isOperador)
             {
-                // Operador solo ve sus propios documentos en el Dashboard
-                query = query.Where(d => d.AuthorId == userId.Value);
+                // Operador no puede ver nada
+                query = query.Where(d => false);
             }
             else
             {
@@ -117,6 +125,13 @@ namespace QualityDoc.Pages
         {
             var userId = HttpContext.Session.GetInt32("UserId");
             if (userId == null) return Unauthorized();
+
+            var rolName = HttpContext.Session.GetString("Rol") ?? "";
+            if (rolName.Trim().Equals("Operador", StringComparison.OrdinalIgnoreCase) ||
+                rolName.Trim().Equals("Operator", StringComparison.OrdinalIgnoreCase))
+            {
+                return BadRequest("El rol Operador no tiene permisos para crear documentos.");
+            }
 
             var usuario = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
             if (usuario == null || usuario.CompanyId == null) 
