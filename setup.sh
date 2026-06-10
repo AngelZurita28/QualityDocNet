@@ -115,7 +115,7 @@ while [ $attempt -le $maxAttempts ] && [ "$isConnected" = false ]; do
         fi
 
         # Importar el script de base de datos
-        scriptPath="./QualityDoc/Database/script_utf8.sql"
+        scriptPath="./QualityDoc/Database/script.sql"
         if [ -f "$scriptPath" ]; then
             echo "Importando script inicial de la base de datos..."
             $DOCKER_CMD cp "$scriptPath" mssql_db:/tmp/script.sql
