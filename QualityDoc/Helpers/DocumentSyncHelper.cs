@@ -1,6 +1,8 @@
 using System.IO;
 using System.Security.Cryptography;
+using System.Text;
 using QualityDoc.Pages.Models;
+using UglyToad.PdfPig;
 
 namespace QualityDoc.Helpers
 {
@@ -19,17 +21,56 @@ namespace QualityDoc.Helpers
         public static object GenerateSyncPayload(Documento documento, string webRootPath)
         {
             var physicalPath = Path.Combine(webRootPath, (documento.FilePath ?? string.Empty).TrimStart('/'));
+            
+            // Robust fallback for development on host vs container
+            if (!File.Exists(physicalPath) && !string.IsNullOrEmpty(documento.FilePath))
+            {
+                var fileName = Path.GetFileName(documento.FilePath);
+                
+                // Try 1: uploads_compartidos in current directory
+                var currentDir = Directory.GetCurrentDirectory();
+                var potentialPath = Path.Combine(currentDir, "uploads_compartidos", fileName);
+                if (File.Exists(potentialPath))
+                {
+                    physicalPath = potentialPath;
+                }
+                else
+                {
+                    // Try 2: uploads_compartidos in parent directory
+                    var parentDir = Directory.GetParent(currentDir)?.FullName;
+                    if (parentDir != null)
+                    {
+                        var potentialParentPath = Path.Combine(parentDir, "uploads_compartidos", fileName);
+                        if (File.Exists(potentialParentPath))
+                        {
+                            physicalPath = potentialParentPath;
+                        }
+                    }
+                }
+                
+                // Try 3: uploads_compartidos moving up from webRootPath
+                if (!File.Exists(physicalPath) && !string.IsNullOrEmpty(webRootPath))
+                {
+                    var webRootParent = Directory.GetParent(webRootPath)?.FullName;
+                    if (webRootParent != null)
+                    {
+                        var webRootGrandParent = Directory.GetParent(webRootParent)?.FullName;
+                        if (webRootGrandParent != null)
+                        {
+                            var potentialWebRootPath = Path.Combine(webRootGrandParent, "uploads_compartidos", fileName);
+                            if (File.Exists(potentialWebRootPath))
+                            {
+                                physicalPath = potentialWebRootPath;
+                            }
+                        }
+                    }
+                }
+            }
+
             var fallbackExtension = Path.GetExtension(documento.FilePath ?? string.Empty).ToLowerInvariant();
             var fallbackCategory = DetectCategory(fallbackExtension);
 
-            object metadata = new
-            {
-                fileSize = "0B",
-                mimeType = GetMimeType(fallbackExtension),
-                extension = fallbackExtension,
-                category = fallbackCategory,
-                specific = GenerateSpecificMetadata(fallbackCategory, fallbackExtension)
-            };
+            var metadata = BuildBaseMetadata(fallbackExtension, fallbackCategory);
 
             if (File.Exists(physicalPath))
             {
@@ -37,18 +78,21 @@ namespace QualityDoc.Helpers
                 var extension = fileInfo.Extension.ToLowerInvariant();
                 var category = DetectCategory(extension);
 
-                metadata = new
+                metadata = BuildBaseMetadata(extension, category);
+                metadata["fileSize"] = FormatBytes(fileInfo.Length);
+                metadata["checksum"] = ComputeHash(physicalPath, MD5.Create());
+                metadata["sha256"] = ComputeHash(physicalPath, SHA256.Create());
+                metadata["createdOnDisk"] = fileInfo.CreationTimeUtc.ToString("o");
+                metadata["modifiedOnDisk"] = fileInfo.LastWriteTimeUtc.ToString("o");
+
+                if (extension == ".pdf")
                 {
-                    fileSize = FormatBytes(fileInfo.Length),
-                    mimeType = GetMimeType(extension),
-                    extension = extension,
-                    checksum = ComputeHash(physicalPath, MD5.Create()),
-                    sha256 = ComputeHash(physicalPath, SHA256.Create()),
-                    createdOnDisk = fileInfo.CreationTimeUtc.ToString("o"),
-                    modifiedOnDisk = fileInfo.LastWriteTimeUtc.ToString("o"),
-                    category = category,
-                    specific = GenerateSpecificMetadata(category, extension)
-                };
+                    AddPdfTextMetadata(metadata, physicalPath);
+                }
+            }
+            else
+            {
+                metadata["fileNotFoundError"] = $"No se encontro el archivo fisico en la ruta principal ni en las alternativas. Ruta buscada: {physicalPath}";
             }
 
             return new
@@ -67,6 +111,56 @@ namespace QualityDoc.Helpers
                 createdAt = documento.CreatedAt,
                 metadata = metadata
             };
+        }
+
+        private static Dictionary<string, object?> BuildBaseMetadata(string extension, string category)
+        {
+            return new Dictionary<string, object?>
+            {
+                ["fileSize"] = "0B",
+                ["mimeType"] = GetMimeType(extension),
+                ["extension"] = extension,
+                ["category"] = category,
+                ["specific"] = GenerateSpecificMetadata(category, extension)
+            };
+        }
+
+        private static void AddPdfTextMetadata(Dictionary<string, object?> metadata, string physicalPath)
+        {
+            try
+            {
+                using var pdf = PdfDocument.Open(physicalPath);
+                var text = new StringBuilder();
+                var hasImages = false;
+
+                foreach (var page in pdf.GetPages())
+                {
+                    if (text.Length > 0)
+                    {
+                        text.AppendLine();
+                        text.AppendLine();
+                    }
+
+                    text.AppendLine(page.Text);
+                    hasImages = hasImages || page.GetImages().Any();
+                }
+
+                var fullText = text.ToString().Trim();
+                metadata["fullText"] = fullText;
+                metadata["texto"] = fullText;
+                metadata["extractedText"] = fullText;
+                metadata["documentText"] = fullText;
+                metadata["specific"] = new
+                {
+                    pageCount = pdf.NumberOfPages,
+                    hasImages = hasImages,
+                    language = "es"
+                };
+            }
+            catch (Exception ex)
+            {
+                metadata["textExtractionError"] = ex.Message;
+            }
         }
 
         private static string DetectCategory(string extension)
