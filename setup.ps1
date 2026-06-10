@@ -6,77 +6,113 @@ Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "  Iniciando configuracion del Proyecto" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 
-# 1. Verificar si Docker esta corriendo
+# 1. Verificar Docker
 try {
     $null = docker info 2>&1
     if ($LASTEXITCODE -ne 0) { throw }
 } catch {
-    Write-Host "ERROR: Docker no esta ejecutandose o no esta instalado." -ForegroundColor Red
-    Write-Host "Por favor, abre Docker Desktop y vuelve a ejecutar este script." -ForegroundColor Yellow
+    Write-Host "ERROR: Docker no esta ejecutandose." -ForegroundColor Red
     Read-Host "Presiona Enter para salir..."
-    exit
+    exit 1
 }
 
-# 2. Pedir credenciales
-Write-Host "`nConfiguracion de la Base de Datos:" -ForegroundColor Green
-$dbUser = Read-Host "Ingresa el USUARIO que deseas usar (ej. sa)"
+# 2. Pedir credenciales con Validacion Estricta
+$dbUser = Read-Host "Ingresa el USUARIO que deseas usar (Enter para usar 'sa')"
 if ([string]::IsNullOrWhiteSpace($dbUser)) { $dbUser = "sa" }
 
-Write-Host "`nNOTA: SQL Server requiere una contrasena fuerte (minimo 8 caracteres, mayusculas, minusculas y numeros)." -ForegroundColor Yellow
-$dbPassword = Read-Host -AsSecureString "Ingresa la CONTRASENA"
-$dbPasswordPlain = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($dbPassword))
+$isValidPassword = $false
+while (-not $isValidPassword) {
+    Write-Host "`nLa contrasena debe tener: Minimo 8 caracteres, mayusculas, minusculas y numeros/simbolos." -ForegroundColor Yellow
+    $dbPassword = Read-Host -AsSecureString "Ingresa la CONTRASENA"
+    $dbPasswordPlain = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($dbPassword))
+    
+    # Expresion regular para validar la complejidad requerida por SQL Server
+    if ($dbPasswordPlain -match '^(?=.*[a-z])(?=.*[A-Z])(?=.*\d|.*[^\w\s]).{8,}$') {
+        $isValidPassword = $true
+        Write-Host "Formato de contrasena valido." -ForegroundColor Green
+    } else {
+        Write-Host "ERROR: La contrasena no cumple con los requisitos. Intenta de nuevo." -ForegroundColor Red
+    }
+}
 
-# Usamos la misma contraseña para el administrador root (sa) del contenedor
 $saPassword = $dbPasswordPlain 
 
-# 3. Guardar credenciales en un archivo .env (Docker Compose lo lee automaticamente)
-Write-Host "`nGenerando archivo de entorno (.env)..."
+# 3. Guardar en .env
+Write-Host "`nGenerando archivo .env..."
 Set-Content -Path ".env" -Value "DB_USER=$dbUser" -Encoding ascii
 Add-Content -Path ".env" -Value "DB_PASSWORD=$dbPasswordPlain" -Encoding ascii
 Add-Content -Path ".env" -Value "SA_PASSWORD=$saPassword" -Encoding ascii
 
-# 4. Crear carpeta de volúmenes si no existe
-if (-not (Test-Path -Path ".\uploads_compartidos")) {
-    New-Item -ItemType Directory -Force -Path ".\uploads_compartidos" | Out-Null
-    Write-Host "Directorio 'uploads_compartidos' creado."
+if (-not (Test-Path -Path ".\uploads_compartidos")) { 
+    New-Item -ItemType Directory -Force -Path ".\uploads_compartidos" | Out-Null 
 }
 
-# 5. Iniciar Docker Compose
-Write-Host "`nLevantando contenedores... (Esto puede tomar unos minutos la primera vez)" -ForegroundColor Cyan
+# 4. Limpiar e Iniciar Docker
+Write-Host "`nLimpiando contenedores anteriores (y volumenes) para evitar datos corruptos..." -ForegroundColor Cyan
+docker-compose down -v
+Write-Host "Levantando contenedores nuevos..." -ForegroundColor Cyan
 docker-compose up -d --build
 
-# 6. Esperar a que el motor de base de datos arranque bien
-Write-Host "`nEsperando 35 segundos a que SQL Server inicie correctamente..."
-Start-Sleep -Seconds 35
+# 5. Bucle de Conexion y Configuracion
+$maxAttempts = 20
+$attempt = 1
+$isConnected = $false
 
-# 7. Crear el usuario personalizado si no eligió 'sa'
-if ($dbUser -ne "sa") {
-    Write-Host "Creando usuario '$dbUser' en la base de datos..."
-    $sqlQuery = "IF NOT EXISTS (SELECT * FROM sys.server_principals WHERE name = N'$dbUser') BEGIN CREATE LOGIN [$dbUser] WITH PASSWORD = '$dbPasswordPlain'; END; ALTER SERVER ROLE sysadmin ADD MEMBER [$dbUser];"
-    $execResult = docker exec -i mssql_db /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$saPassword" -C -Q "$sqlQuery"
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "Advertencia: Hubo un problema al crear el usuario. Revisa los logs: $execResult" -ForegroundColor Yellow
+Write-Host "`nEsperando 15 segundos iniciales a que el motor arranque..."
+Start-Sleep -Seconds 15
+
+while ($attempt -le $maxAttempts -and -not $isConnected) {
+    Write-Host "`n[Intento $attempt/$maxAttempts] Verificando conexion con la base de datos..."
+    
+    # Intentamos una consulta simple. Pasamos las credenciales por variables de entorno de Docker 
+    # para evitar que PowerShell rompa los caracteres especiales en la linea de comandos.
+    $checkQuery = "SELECT 1;"
+    $checkResult = docker exec -e SQLCMDUSER=sa -e "SQLCMDPASSWORD=$saPassword" -i mssql_db /opt/mssql-tools18/bin/sqlcmd -S localhost -C -Q "$checkQuery" 2>&1
+    
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "¡Conexion exitosa a SQL Server!" -ForegroundColor Green
+        $isConnected = $true
+        
+        # Crear usuario personalizado si es necesario
+        if ($dbUser -ne "sa") {
+            Write-Host "Creando usuario '$dbUser' en la base de datos..."
+            $sqlQuery = "IF NOT EXISTS (SELECT * FROM sys.server_principals WHERE name = N'$dbUser') BEGIN CREATE LOGIN [$dbUser] WITH PASSWORD = '$dbPasswordPlain'; END; ALTER SERVER ROLE sysadmin ADD MEMBER [$dbUser];"
+            $userResult = docker exec -e SQLCMDUSER=sa -e "SQLCMDPASSWORD=$saPassword" -i mssql_db /opt/mssql-tools18/bin/sqlcmd -S localhost -C -Q "$sqlQuery" 2>&1
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "Advertencia al crear usuario: $userResult" -ForegroundColor Yellow
+            } else {
+                Write-Host "Usuario '$dbUser' verificado/creado con exito." -ForegroundColor Green
+            }
+        }
+
+        # Importar el script de base de datos
+        $scriptPath = ".\QualityDoc\Database\script_utf8.sql"
+        if (Test-Path -Path $scriptPath) {
+            Write-Host "Importando script inicial de la base de datos..."
+            docker cp $scriptPath mssql_db:/tmp/script.sql
+            $importResult = docker exec -e SQLCMDUSER=sa -e "SQLCMDPASSWORD=$saPassword" -i mssql_db /opt/mssql-tools18/bin/sqlcmd -S localhost -C -i /tmp/script.sql 2>&1
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "¡Base de datos importada!" -ForegroundColor Green
+            } else {
+                Write-Host "Hubo un error importando el script: $importResult" -ForegroundColor Red
+            }
+        }
     } else {
-        Write-Host "Usuario '$dbUser' verificado/creado con exito." -ForegroundColor Green
+        Write-Host "El motor aun no esta listo o rechazo la conexion. Esperando 10 segundos..." -ForegroundColor Yellow
+        Write-Host "(Mensaje interno: $checkResult)" -ForegroundColor DarkGray
+        Start-Sleep -Seconds 10
+        $attempt++
     }
 }
 
-# 8. Importar el script de base de datos
-$scriptPath = ".\QualityDoc\Database\script_utf8.sql"
-if (Test-Path -Path $scriptPath) {
-    Write-Host "Importando script inicial de la base de datos..."
-    # Copiamos el archivo al contenedor para evitar problemas de codificación de Windows a Linux
-    docker cp $scriptPath mssql_db:/tmp/script.sql
-    # Ejecutamos el archivo desde adentro del contenedor
-    docker exec -i mssql_db /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$saPassword" -C -i /tmp/script.sql
-    Write-Host "¡Base de datos importada!" -ForegroundColor Green
+if (-not $isConnected) {
+    Write-Host "`nERROR FATAL: No se pudo conectar a la base de datos despues de $maxAttempts intentos." -ForegroundColor Red
+    Write-Host "Es posible que la contrasena tenga algun caracter no compatible o Docker este fallando." -ForegroundColor Red
 } else {
-    Write-Host "Aviso: No se encontro el archivo script_utf8.sql en $scriptPath" -ForegroundColor Yellow
+    Write-Host "`n========================================" -ForegroundColor Green
+    Write-Host "  ¡Entorno configurado con exito!" -ForegroundColor Green
+    Write-Host "  La app esta disponible en: http://localhost:5000" -ForegroundColor Cyan
+    Write-Host "========================================" -ForegroundColor Green
 }
 
-Write-Host "`n========================================" -ForegroundColor Green
-Write-Host "  ¡Entorno configurado con exito!" -ForegroundColor Green
-Write-Host "  La app esta disponible en: http://localhost:5000" -ForegroundColor Cyan
-Write-Host "========================================" -ForegroundColor Green
-Write-Host "Presiona cualquier tecla para cerrar esta ventana..."
-$null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+Read-Host "Presiona Enter para salir..."
