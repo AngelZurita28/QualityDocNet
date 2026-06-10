@@ -6,16 +6,35 @@ namespace QualityDoc.Helpers
 {
     public static class DocumentSyncHelper
     {
+        public static string GetHealthEndpoint(string documentsEndpoint)
+        {
+            if (Uri.TryCreate(documentsEndpoint, UriKind.Absolute, out var uri))
+            {
+                return $"{uri.Scheme}://{uri.Authority}/api/saludo";
+            }
+
+            return "http://localhost:3000/api/saludo";
+        }
+
         public static object GenerateSyncPayload(Documento documento, string webRootPath)
         {
             var physicalPath = Path.Combine(webRootPath, (documento.FilePath ?? string.Empty).TrimStart('/'));
-            
-            object? metadata = null;
+            var fallbackExtension = Path.GetExtension(documento.FilePath ?? string.Empty).ToLowerInvariant();
+            var fallbackCategory = DetectCategory(fallbackExtension);
+
+            object metadata = new
+            {
+                fileSize = "0B",
+                mimeType = GetMimeType(fallbackExtension),
+                extension = fallbackExtension,
+                category = fallbackCategory,
+                specific = GenerateSpecificMetadata(fallbackCategory, fallbackExtension)
+            };
 
             if (File.Exists(physicalPath))
             {
                 var fileInfo = new FileInfo(physicalPath);
-                var extension = fileInfo.Extension.ToLower();
+                var extension = fileInfo.Extension.ToLowerInvariant();
                 var category = DetectCategory(extension);
 
                 metadata = new
@@ -34,17 +53,18 @@ namespace QualityDoc.Helpers
 
             return new
             {
-                Id = documento.Id.ToString().ToUpper(),
-                Title = documento.Title,
-                Description = documento.Description,
-                FilePath = documento.FilePath,
-                VersionNumber = documento.VersionNumber,
-                CompanyId = documento.CompanyId,
-                AuthorId = documento.AuthorId,
-                StatusId = documento.StatusId,
-                ParentId = documento.ParentId,
-                IsLatest = documento.IsLatest,
-                CreatedAt = documento.CreatedAt,
+                id = documento.Id.ToString().ToUpperInvariant(),
+                documentCode = documento.DocumentCode,
+                title = documento.Title,
+                description = documento.Description,
+                filePath = documento.FilePath,
+                versionNumber = documento.VersionNumber,
+                companyId = documento.CompanyId,
+                authorId = documento.AuthorId,
+                statusId = documento.StatusId,
+                parentId = documento.ParentId,
+                isLatest = documento.IsLatest,
+                createdAt = documento.CreatedAt,
                 metadata = metadata
             };
         }

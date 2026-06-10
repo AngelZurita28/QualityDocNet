@@ -224,23 +224,40 @@ namespace QualityDoc.Pages.Documents
                 return BadRequest("No tienes permiso para sincronizar este documento.");
             }
 
-            // Si ya está sincronizado, no hacer nada (por si el botón se pica dos veces)
+            if (string.IsNullOrWhiteSpace(documento.DocumentCode))
+            {
+                TempData["ErrorMessage"] = "No se puede sincronizar con MongoDB: el documento no tiene codigo.";
+                return RedirectToPage(new { pageNumber = PageNumber });
+            }
+
+            // Si ya esta sincronizado, no hacer nada (por si el boton se pica dos veces)
             if (documento.SyncFirebase)
             {
-                TempData["SuccessMessage"] = "Este documento ya estaba sincronizado con Firebase.";
+                TempData["SuccessMessage"] = "Este documento ya estaba sincronizado con MongoDB.";
                 return RedirectToPage(new { pageNumber = PageNumber });
             }
 
             var payload = DocumentSyncHelper.GenerateSyncPayload(documento, _env.WebRootPath);
+            var mongoEndpoint = _configuration["MongoSync:Endpoint"] ?? "http://localhost:3000/api/documents";
+            var mongoHealthEndpoint = _configuration["MongoSync:HealthEndpoint"]
+                ?? DocumentSyncHelper.GetHealthEndpoint(mongoEndpoint);
 
             try
             {
                 var client = _httpClientFactory.CreateClient();
 
-                var response = await client.PostAsJsonAsync(
-                    "http://localhost:3000/api/documents",
-                    payload
-                );
+                var healthResponse = await client.GetAsync(mongoHealthEndpoint);
+                var healthBody = await healthResponse.Content.ReadAsStringAsync();
+
+                if (!healthResponse.IsSuccessStatusCode)
+                {
+                    documento.LastErrorLog = healthBody;
+                    TempData["ErrorMessage"] = "MongoDB API no respondio en /api/saludo: " + healthResponse.StatusCode;
+                    await _context.SaveChangesAsync();
+                    return RedirectToPage(new { pageNumber = PageNumber });
+                }
+
+                var response = await client.PostAsJsonAsync(mongoEndpoint, payload);
 
                 var responseBody = await response.Content.ReadAsStringAsync();
 
@@ -248,33 +265,33 @@ namespace QualityDoc.Pages.Documents
                 {
                     documento.SyncFirebase = true;
                     documento.LastErrorLog = null;
-                    TempData["SuccessMessage"] = "Sincronizado con Firebase exitosamente.";
+                    TempData["SuccessMessage"] = "Sincronizado con MongoDB exitosamente.";
                 }
                 else
                 {
-                    // Chequeo directo en el texto: si dice "ya existe", lo tratamos como éxito
-                    // porque el documento ya está en Firestore (posiblemente sincronizado antes)
+                    // La API de MongoDB responde 409 cuando el id ya existe; para este flujo significa que ya esta sincronizado.
                     bool yaExiste = responseBody.Contains("ya existe", StringComparison.OrdinalIgnoreCase)
                                  || responseBody.Contains("already exists", StringComparison.OrdinalIgnoreCase)
-                                 || responseBody.Contains("duplicate", StringComparison.OrdinalIgnoreCase);
+                                 || responseBody.Contains("duplicate", StringComparison.OrdinalIgnoreCase)
+                                 || response.StatusCode == System.Net.HttpStatusCode.Conflict;
 
                     if (yaExiste)
                     {
                         documento.SyncFirebase = true;
                         documento.LastErrorLog = null;
-                        TempData["SuccessMessage"] = "El documento ya estaba sincronizado con Firebase.";
+                        TempData["SuccessMessage"] = "El documento ya estaba sincronizado con MongoDB.";
                     }
                     else
                     {
                         documento.LastErrorLog = responseBody;
-                        TempData["ErrorMessage"] = "Error al sincronizar: " + response.StatusCode;
+                        TempData["ErrorMessage"] = "Error al sincronizar con MongoDB: " + response.StatusCode;
                     }
                 }
             }
             catch (Exception ex)
             {
                 documento.LastErrorLog = ex.Message;
-                TempData["ErrorMessage"] = "Fallo de conexión al sincronizar.";
+                TempData["ErrorMessage"] = "Fallo de conexion al sincronizar con MongoDB.";
             }
 
             await _context.SaveChangesAsync();

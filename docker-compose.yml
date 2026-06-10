@@ -10,10 +10,14 @@ services:
       - ASPNETCORE_URLS=http://0.0.0.0:5000
       - ASPNETCORE_ENVIRONMENT=Development
       - DOTNET_WATCH_SUPPRESS_LAUNCH_BROWSER=1
+      - MongoSync__Endpoint=http://host.docker.internal:3000/api/documents
+      - MongoSync__HealthEndpoint=http://host.docker.internal:3000/api/saludo
       # Conexión dinámica. Usa el nombre del contenedor de la DB ("mssql_db")
       - ConnectionStrings__DefaultConnection=Server=mssql_db;Database=QualityDocDB;User Id=${DB_USER};Password=${DB_PASSWORD};TrustServerCertificate=True;
     ports:
       - "5000:5000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./QualityDoc:/app                      
       - ./uploads_compartidos:/app/wwwroot/uploads 
