@@ -2,12 +2,16 @@
 @model QualityDoc.Pages.Documents.ApprovalModel
 @{
     ViewData["Title"] = "Aprobaciones";
+    var diffInsertedCount = Model.DiffLines?.Count(line => line.Type == DiffPlex.DiffBuilder.Model.ChangeType.Inserted) ?? 0;
+    var diffDeletedCount = Model.DiffLines?.Count(line => line.Type == DiffPlex.DiffBuilder.Model.ChangeType.Deleted) ?? 0;
+    var diffUnchangedCount = Model.DiffLines?.Count(line => line.Type == DiffPlex.DiffBuilder.Model.ChangeType.Unchanged) ?? 0;
+    var diffChangeCount = diffInsertedCount + diffDeletedCount;
 }
 
-<div class="p-6 max-w-7xl mx-auto grid grid-cols-5 gap-6">
+<div class="p-6 max-w-7xl mx-auto grid grid-cols-1 xl:grid-cols-5 gap-6">
 
     <!-- Columna Izquierda: Vista del Documento -->
-    <div class="col-span-3 bg-gray-50 border rounded-xl overflow-hidden shadow-sm h-[750px] flex flex-col relative">
+    <div class="xl:col-span-3 bg-gray-50 border rounded-xl overflow-hidden shadow-sm h-[750px] flex flex-col relative">
         @if (Model.Documento != null && !string.IsNullOrEmpty(Model.Documento.FilePath))
         {
             var ext = System.IO.Path.GetExtension(Model.Documento.FilePath).ToLower();
@@ -31,13 +35,17 @@
             @if (Model.DocumentoParent != null)
             {
                 <div class="flex border-b border-gray-200 bg-white z-10 flex-shrink-0">
-                    <button type="button" onclick="switchTab('preview')" id="tab-preview" class="flex-1 py-2.5 px-4 text-xs font-bold text-blue-600 border-b-2 border-blue-600 flex items-center justify-center gap-2 transition-all duration-200 hover:bg-blue-50/30">
+                    <button type="button" onclick="switchTab('preview')" id="tab-preview" aria-controls="container-preview" aria-selected="true" class="flex-1 py-2.5 px-4 text-xs font-bold text-blue-600 border-b-2 border-blue-600 flex items-center justify-center gap-2 transition-all duration-200 hover:bg-blue-50/30">
                         <span class="material-symbols-outlined text-[16px]">visibility</span>
                         Vista Previa
                     </button>
-                    <button type="button" onclick="switchTab('diff')" id="tab-diff" class="flex-1 py-2.5 px-4 text-xs font-bold text-gray-500 border-b-2 border-transparent flex items-center justify-center gap-2 transition-all duration-200 hover:bg-gray-50/50 hover:text-gray-700">
+                    <button type="button" onclick="switchTab('diff')" id="tab-diff" aria-controls="container-diff" aria-selected="false" class="flex-1 py-2.5 px-4 text-xs font-bold text-gray-500 border-b-2 border-transparent flex items-center justify-center gap-2 transition-all duration-200 hover:bg-gray-50/50 hover:text-gray-700">
                         <span class="material-symbols-outlined text-[16px]">difference</span>
                         Comparar con v@(QualityDoc.Services.DocumentVersionService.FormatVersion(Model.DocumentoParent.VersionNumber))
+                        @if (diffChangeCount > 0)
+                        {
+                            <span class="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-extrabold text-blue-700">@diffChangeCount</span>
+                        }
                     </button>
                 </div>
             }
@@ -85,61 +93,92 @@
             @if (Model.DocumentoParent != null)
             {
                 <!-- Comparación Container (Oculto por defecto) -->
-                <div id="container-diff" class="w-full h-full hidden flex flex-col bg-slate-950 overflow-hidden">
-                    <div class="bg-slate-900 border-b border-slate-800 p-3 flex justify-between items-center z-10 flex-shrink-0">
-                        <div class="flex items-center gap-2">
-                            <span class="material-symbols-outlined text-amber-500 text-[18px]">insights</span>
-                            <span class="text-xs font-semibold text-slate-300">
-                                Comparando: v@(QualityDoc.Services.DocumentVersionService.FormatVersion(Model.DocumentoParent.VersionNumber)) vs v@(QualityDoc.Services.DocumentVersionService.FormatVersion(Model.Documento.VersionNumber))
-                            </span>
+                <div id="container-diff" class="w-full h-full hidden flex flex-col bg-slate-50 overflow-hidden" role="tabpanel" aria-labelledby="tab-diff">
+                    <div class="diff-toolbar z-10 flex-shrink-0 border-b border-slate-200 bg-white">
+                        <div class="flex flex-col gap-4 p-4 lg:flex-row lg:items-center lg:justify-between">
+                            <div class="min-w-0">
+                                <div class="mb-1 flex items-center gap-2">
+                                    <span class="material-symbols-outlined rounded-lg bg-blue-50 p-1 text-[18px] text-blue-600">difference</span>
+                                    <p class="text-[10px] font-extrabold uppercase tracking-[0.18em] text-slate-400">Control de diferencias</p>
+                                </div>
+                                <h3 class="truncate text-sm font-extrabold text-slate-800">
+                                    v@(QualityDoc.Services.DocumentVersionService.FormatVersion(Model.DocumentoParent.VersionNumber))
+                                    <span class="mx-1 text-slate-300">→</span>
+                                    v@(QualityDoc.Services.DocumentVersionService.FormatVersion(Model.Documento.VersionNumber))
+                                </h3>
+                                <p class="mt-1 text-xs text-slate-500">Revisa solo el texto extraído del documento antes de aprobar o rechazar.</p>
+                            </div>
+
+                            <div class="grid grid-cols-3 gap-2 text-center">
+                                <div class="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2">
+                                    <p class="text-base font-black text-emerald-700">@diffInsertedCount</p>
+                                    <p class="text-[9px] font-bold uppercase tracking-wider text-emerald-700">Agregadas</p>
+                                </div>
+                                <div class="rounded-xl border border-rose-100 bg-rose-50 px-3 py-2">
+                                    <p class="text-base font-black text-rose-700">@diffDeletedCount</p>
+                                    <p class="text-[9px] font-bold uppercase tracking-wider text-rose-700">Eliminadas</p>
+                                </div>
+                                <div class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                                    <p class="text-base font-black text-slate-700">@diffUnchangedCount</p>
+                                    <p class="text-[9px] font-bold uppercase tracking-wider text-slate-500">Iguales</p>
+                                </div>
+                            </div>
                         </div>
-                        <div class="flex items-center gap-4">
-                            <!-- Color Legend -->
-                            <div class="flex items-center gap-3 text-[10px]">
-                                <span class="flex items-center gap-1 text-rose-400 font-semibold">
-                                    <span class="w-2 h-2 rounded bg-rose-600"></span> Eliminado
+
+                        <div class="flex flex-col gap-3 border-t border-slate-100 bg-slate-50/80 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div class="flex flex-wrap items-center gap-2 text-[11px] font-bold">
+                                <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-emerald-700 ring-1 ring-emerald-100">
+                                    <span class="h-2 w-2 rounded-full bg-emerald-500"></span> Agregado
                                 </span>
-                                <span class="flex items-center gap-1 text-emerald-400 font-semibold">
-                                    <span class="w-2 h-2 rounded bg-emerald-600"></span> Agregado
+                                <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-rose-700 ring-1 ring-rose-100">
+                                    <span class="h-2 w-2 rounded-full bg-rose-500"></span> Eliminado
+                                </span>
+                                <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-slate-500 ring-1 ring-slate-200">
+                                    <span class="h-2 w-2 rounded-full bg-slate-300"></span> Sin cambios
                                 </span>
                             </div>
-                            <!-- Toggle Checkbox -->
-                            <label class="relative inline-flex items-center cursor-pointer select-none">
-                                <input type="checkbox" id="chkShowOnlyChanges" onchange="toggleUnchangedRows()" class="sr-only peer" />
-                                <div class="w-8 h-4 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-blue-600 peer-checked:after:bg-white peer-checked:after:border-white"></div>
-                                <span class="ml-2 text-[11px] font-medium text-slate-300">Ver solo cambios</span>
+
+                            <div class="flex flex-wrap items-center gap-2">
+                                <button type="button" onclick="scrollToFirstChange()" class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-extrabold text-slate-700 shadow-sm transition hover:border-blue-200 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <span class="material-symbols-outlined text-[16px]">south</span>
+                                    Primera diferencia
+                                </button>
+                                <label class="inline-flex cursor-pointer select-none items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
+                                    <input type="checkbox" id="chkShowOnlyChanges" onchange="toggleUnchangedRows()" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                                    <span class="text-[11px] font-extrabold text-slate-700">Ver solo cambios</span>
                             </label>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="flex-1 overflow-auto bg-slate-950 font-mono text-[11px] select-text">
+                    <div class="diff-scroll flex-1 overflow-auto bg-slate-50 font-mono text-[12px] select-text">
                         @if (Model.DiffLines != null && Model.DiffLines.Any())
                         {
-                            <table class="min-w-full divide-y divide-slate-800 border-collapse table-fixed">
-                                <thead class="bg-slate-900 sticky top-0 z-20 text-[10px] text-slate-400 uppercase tracking-wider">
+                            <table class="min-w-full border-collapse table-fixed">
+                                <thead class="sticky top-0 z-20 border-b border-slate-200 bg-white text-[10px] uppercase tracking-wider text-slate-500 shadow-sm">
                                     <tr>
-                                        <th scope="col" class="px-3 py-1.5 text-left font-bold border-r border-slate-800 w-[110px]">Antiguo</th>
-                                        <th scope="col" class="px-3 py-1.5 text-left font-bold border-r border-slate-800 w-[110px]">Nuevo</th>
-                                        <th scope="col" class="px-1 py-1.5 text-center font-bold w-5"></th>
-                                        <th scope="col" class="px-3 py-1.5 text-left font-bold w-[calc(100%-245px)]">Contenido</th>
+                                        <th scope="col" class="w-[92px] border-r border-slate-200 px-3 py-2 text-center font-extrabold">Anterior</th>
+                                        <th scope="col" class="w-[92px] border-r border-slate-200 px-3 py-2 text-center font-extrabold">Nueva</th>
+                                        <th scope="col" class="w-10 px-1 py-2 text-center font-extrabold">Tipo</th>
+                                        <th scope="col" class="px-3 py-2 text-left font-extrabold">Contenido</th>
                                     </tr>
                                 </thead>
-                                <tbody class="divide-y divide-slate-900">
+                                <tbody class="divide-y divide-slate-100">
                                     @foreach (var line in Model.DiffLines)
                                     {
                                         var isInserted = line.Type == DiffPlex.DiffBuilder.Model.ChangeType.Inserted;
                                         var isDeleted = line.Type == DiffPlex.DiffBuilder.Model.ChangeType.Deleted;
                                         var isUnchanged = line.Type == DiffPlex.DiffBuilder.Model.ChangeType.Unchanged;
                                         
-                                        var rowClass = isInserted ? "bg-emerald-950/20 text-emerald-300 hover:bg-emerald-900/30" 
-                                                     : isDeleted ? "bg-rose-950/20 text-rose-300 hover:bg-rose-900/30" 
-                                                     : "unchanged-row text-slate-400 hover:bg-slate-900/30";
+                                        var rowClass = isInserted ? "change-row bg-emerald-50 text-emerald-950 hover:bg-emerald-100/70 border-l-4 border-emerald-500"
+                                                     : isDeleted ? "change-row bg-rose-50 text-rose-950 hover:bg-rose-100/70 border-l-4 border-rose-500"
+                                                     : "unchanged-row bg-white text-slate-500 hover:bg-slate-100 border-l-4 border-transparent";
                                                      
                                         var sign = isInserted ? "+" : isDeleted ? "-" : " ";
-                                        var signClass = isInserted ? "text-emerald-500" : isDeleted ? "text-rose-500" : "text-slate-600";
+                                        var signClass = isInserted ? "bg-emerald-600 text-white" : isDeleted ? "bg-rose-600 text-white" : "bg-slate-100 text-slate-400";
                                         
-                                        <tr class="transition-colors @rowClass">
-                                            <td class="px-3 py-0.5 font-mono text-[9px] text-slate-500 border-r border-slate-900 text-center whitespace-nowrap">
+                                        <tr class="diff-row transition-colors @rowClass" data-change-row="@(isInserted || isDeleted ? "true" : "false")">
+                                            <td class="border-r border-slate-200 px-3 py-1.5 text-center font-mono text-[10px] text-slate-500 whitespace-nowrap">
                                                 @if (line.OldPageNumber.HasValue)
                                                 {
                                                     <span>P.@line.OldPageNumber L.@line.OldLineNumber</span>
@@ -149,7 +188,7 @@
                                                     <span class="opacity-20">-</span>
                                                 }
                                             </td>
-                                            <td class="px-3 py-0.5 font-mono text-[9px] text-slate-500 border-r border-slate-900 text-center whitespace-nowrap">
+                                            <td class="border-r border-slate-200 px-3 py-1.5 text-center font-mono text-[10px] text-slate-500 whitespace-nowrap">
                                                 @if (line.NewPageNumber.HasValue)
                                                 {
                                                     <span>P.@line.NewPageNumber L.@line.NewLineNumber</span>
@@ -159,8 +198,10 @@
                                                     <span class="opacity-20">-</span>
                                                 }
                                             </td>
-                                            <td class="px-1 py-0.5 font-bold text-center select-none @signClass">@sign</td>
-                                            <td class="px-3 py-0.5 whitespace-pre-wrap break-all font-mono">@line.Content</td>
+                                            <td class="px-1 py-1.5 text-center select-none">
+                                                <span class="inline-flex h-5 w-5 items-center justify-center rounded-full font-black @signClass">@sign</span>
+                                            </td>
+                                            <td class="px-3 py-1.5 whitespace-pre-wrap break-words font-mono leading-relaxed">@line.Content</td>
                                         </tr>
                                     }
                                 </tbody>
@@ -168,18 +209,18 @@
                         }
                         else if (!string.IsNullOrEmpty(Model.DiffError))
                         {
-                            <div class="p-8 text-center text-slate-400">
-                                <span class="material-symbols-outlined text-4xl text-rose-500 mb-2">warning</span>
-                                <p class="font-bold">No se puede mostrar la comparación</p>
-                                <p class="text-xs text-slate-500 mt-1">@Model.DiffError</p>
+                            <div class="m-6 rounded-2xl border border-rose-100 bg-white p-8 text-center text-slate-600 shadow-sm">
+                                <span class="material-symbols-outlined mb-2 rounded-full bg-rose-50 p-3 text-4xl text-rose-500">warning</span>
+                                <p class="font-extrabold text-slate-800">No se puede mostrar la comparación</p>
+                                <p class="mt-2 text-xs text-slate-500">@Model.DiffError</p>
                             </div>
                         }
                         else
                         {
-                            <div class="p-8 text-center text-slate-400">
-                                <span class="material-symbols-outlined text-4xl text-slate-500 mb-2">find_in_page</span>
-                                <p class="font-bold">No se encontraron diferencias en el texto</p>
-                                <p class="text-xs text-slate-500 mt-1">Ambos documentos tienen exactamente el mismo texto o no son PDFs con texto extraíble.</p>
+                            <div class="m-6 rounded-2xl border border-slate-200 bg-white p-8 text-center text-slate-600 shadow-sm">
+                                <span class="material-symbols-outlined mb-2 rounded-full bg-blue-50 p-3 text-4xl text-blue-500">task_alt</span>
+                                <p class="font-extrabold text-slate-800">No se encontraron diferencias en el texto</p>
+                                <p class="mt-2 text-xs text-slate-500">Ambos documentos tienen el mismo texto extraíble o no son PDFs con texto seleccionable.</p>
                             </div>
                         }
                     </div>
@@ -197,7 +238,7 @@
     </div>
 
     <!-- Columna Derecha: Información + Acciones (UNIFICADOS) -->
-    <div class="col-span-2">
+    <div class="xl:col-span-2">
         <div class="bg-white rounded-2xl border shadow-lg overflow-hidden flex flex-col h-fit">
             <!-- Sección de Información -->
             <div class="p-6 border-b border-gray-50">
@@ -498,6 +539,22 @@
     .hide-unchanged .unchanged-row {
         display: none !important;
     }
+
+    .diff-scroll {
+        scrollbar-color: #cbd5e1 #f8fafc;
+        scrollbar-width: thin;
+    }
+
+    .diff-row.diff-focus {
+        animation: diffFocusPulse 1.2s ease-out;
+        outline: 2px solid #2563eb;
+        outline-offset: -2px;
+    }
+
+    @@keyframes diffFocusPulse {
+        0% { box-shadow: inset 0 0 0 999px rgba(37, 99, 235, 0.16); }
+        100% { box-shadow: inset 0 0 0 999px rgba(37, 99, 235, 0); }
+    }
 </style>
 
 <script>
@@ -522,15 +579,18 @@
         const diffTab = document.getElementById("tab-diff");
         const previewContainer = document.getElementById("container-preview");
         const diffContainer = document.getElementById("container-diff");
+        const isPreview = tab === 'preview';
         
-        if (tab === 'preview') {
+        if (isPreview) {
             if (previewTab) {
                 previewTab.classList.remove("text-gray-500", "border-transparent");
                 previewTab.classList.add("text-blue-600", "border-blue-600");
+                previewTab.setAttribute("aria-selected", "true");
             }
             if (diffTab) {
                 diffTab.classList.remove("text-blue-600", "border-blue-600");
                 diffTab.classList.add("text-gray-500", "border-transparent");
+                diffTab.setAttribute("aria-selected", "false");
             }
             if (previewContainer) previewContainer.classList.remove("hidden");
             if (diffContainer) diffContainer.classList.add("hidden");
@@ -538,10 +598,12 @@
             if (diffTab) {
                 diffTab.classList.remove("text-gray-500", "border-transparent");
                 diffTab.classList.add("text-blue-600", "border-blue-600");
+                diffTab.setAttribute("aria-selected", "true");
             }
             if (previewTab) {
                 previewTab.classList.remove("text-blue-600", "border-blue-600");
                 previewTab.classList.add("text-gray-500", "border-transparent");
+                previewTab.setAttribute("aria-selected", "false");
             }
             if (previewContainer) previewContainer.classList.add("hidden");
             if (diffContainer) diffContainer.classList.remove("hidden");
@@ -558,6 +620,18 @@
                 container.classList.remove("hide-unchanged");
             }
         }
+    }
+
+    function scrollToFirstChange() {
+        const diffContainer = document.getElementById("container-diff");
+        const firstChange = diffContainer?.querySelector('[data-change-row="true"]');
+
+        if (!firstChange) return;
+
+        firstChange.scrollIntoView({ behavior: "smooth", block: "center" });
+        firstChange.classList.remove("diff-focus");
+        window.setTimeout(() => firstChange.classList.add("diff-focus"), 40);
+        window.setTimeout(() => firstChange.classList.remove("diff-focus"), 1400);
     }
 </script>
 
@@ -633,5 +707,3 @@
         </form>
     </div>
 </div>
-
-
