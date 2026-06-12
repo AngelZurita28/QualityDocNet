@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using QualityDoc.Data;
 using QualityDoc.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;

@@ -174,17 +174,12 @@ namespace QualityDoc.Pages
             {
                 var docBase = await _context.Documents
                     .Where(d => d.DocumentCode == CodigoExistente && d.CompanyId == usuario.CompanyId)
-                    .OrderByDescending(d => d.VersionNumber)
+                    .OrderByDescending(d => d.CreatedAt)
                     .FirstOrDefaultAsync();
 
                 if (docBase == null) return BadRequest("Documento base no encontrado.");
 
-                var activeBase = await _context.Documents
-                    .Where(d => d.DocumentCode == CodigoExistente && d.CompanyId == usuario.CompanyId && d.IsLatest)
-                    .OrderByDescending(d => d.VersionNumber)
-                    .FirstOrDefaultAsync();
-
-                parentId = activeBase?.Id ?? docBase.Id;
+                parentId = docBase.Id;
                 documentCode = docBase.DocumentCode!;
             }
             else

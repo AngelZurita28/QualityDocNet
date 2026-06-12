@@ -27,6 +27,10 @@ namespace QualityDoc.Pages.Documents
         public bool CanSendReview { get; set; } = false;
         public bool CanEdit { get; set; } = false;
 
+        public Documento? DocumentoParent { get; set; }
+        public List<DiffResultLine>? DiffLines { get; set; }
+        public string? DiffError { get; set; }
+
         [BindProperty]
         public string EditTitle { get; set; } = string.Empty;
         [BindProperty]
@@ -103,6 +107,38 @@ namespace QualityDoc.Pages.Documents
                         .ToListAsync();
 
                     VersionesAnteriores = await _versionService.GetRealVersionHistoryAsync(Documento.DocumentCode, Documento.CompanyId, Documento.Id);
+
+                    if (Documento.ParentId.HasValue)
+                    {
+                        DocumentoParent = await _context.Documents
+                            .Include(d => d.Author)
+                            .Include(d => d.Company)
+                            .Include(d => d.Status)
+                            .Include(d => d.Department)
+                            .FirstOrDefaultAsync(d => d.Id == Documento.ParentId.Value);
+
+                        if (DocumentoParent != null)
+                        {
+                            try
+                            {
+                                var oldPath = DocumentDiffHelper.ResolvePhysicalPath(DocumentoParent.FilePath, _env.WebRootPath);
+                                var newPath = DocumentDiffHelper.ResolvePhysicalPath(Documento.FilePath, _env.WebRootPath);
+
+                                if (System.IO.File.Exists(oldPath) && System.IO.File.Exists(newPath))
+                                {
+                                    DiffLines = DocumentDiffHelper.CompareDocuments(oldPath, newPath);
+                                }
+                                else
+                                {
+                                    DiffError = "No se encontraron los archivos físicos de ambas versiones para realizar la comparación.";
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                DiffError = $"Error al procesar la comparación: {ex.Message}";
+                            }
+                        }
+                    }
                 }
             }
 
